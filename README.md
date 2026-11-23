@@ -38,7 +38,8 @@
 
 1. `posture-alert-macos.zip`을 풀면 **`posture-alert.app`**이 나와요. 응용 프로그램 폴더로 옮기면 편해요.
 2. 더블클릭하면 아래처럼 경고가 떠요. **서명이 없는 앱이라 처음 한 번만** 뜨고, 앱이 해롭다는 뜻은 아니에요.
-   > Apple은 'posture-alert.app'에 사용자의 Mac에 손상을 입히거나 … 악성 코드가 없음을 확인할 수 없습니다.
+
+   <img src="docs/screenshots/mac_gatekeeper_v2.png" width="280" alt="Apple은 'posture-alert.app'에 악성 코드가 없음을 확인할 수 없습니다">
 
    **완료**를 눌러 닫아요. ("휴지통으로 이동"은 누르지 마세요.)
 3. **시스템 설정 → 개인정보 보호 및 보안**을 열고, 아래로 스크롤해서 "'posture-alert.app'이(가) 차단되었습니다" 옆의 **그래도 열기**를 눌러요. (비밀번호나 Touch ID를 물어봐요.)
