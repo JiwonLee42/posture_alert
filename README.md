@@ -100,7 +100,9 @@
 
 **타이핑 중에도 알림이 떠요?** 키보드·마우스를 쓰는 중에는 입력이 잠깐 멈출 때까지 기다렸다가 띄워요. 자리를 3분 이상 비우면 "일어난 것"으로 쳐요.
 
-**기록은 어디에 저장돼요?** `%APPDATA%\posture-alert\posture_alert.sqlite3` (SQLite)예요.
+**기록은 어디에 저장돼요?** Windows는 `%APPDATA%\posture-alert\`, Mac은 `~/Library/Application Support/posture-alert/`에 있어요. `posture_alert.sqlite3`(기록)와 `posture_alert.log`(로그)가 들어 있어요.
+
+**알림이 이상해요.** 트레이(메뉴바) 아이콘 메뉴의 **로그 폴더 열기**로 `posture_alert.log`를 열어 보세요. 알림이 언제 왜 떴는지(또는 안 떴는지)가 한 줄씩 남아 있어요.
 
 ## 문서
 
