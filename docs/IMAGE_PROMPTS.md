@@ -9,8 +9,8 @@ ChatGPT(이미지 생성), Gemini, Midjourney 어디서든 쓸 수 있게 영어
 
 ## 1. 만드는 순서 (요약)
 
-1. 이미지 생성 도구에 **기준 그림을 첨부**해요 (여성 캐릭터면 여성 그림, 남성이면 남성 그림).
-2. 아래 **2장의 공통 프롬프트** + **3장의 동작 프롬프트**를 붙여서 요청해요.
+1. 이미지 생성 도구에 **이미 만든 목 옆 늘리기 그림을 첨부**해요 (여성이면 여성 그림, 남성이면 남성 그림).
+2. 아래 **3장의 [A] 공통 + [B] 캐릭터 + [C] 동작** 프롬프트를 붙여서 요청해요.
    → 기준 그림처럼 **왼쪽 (X) / 오른쪽 (O) 두 칸**짜리 그림이 나와요.
 3. 받은 그림을 자르기 스크립트로 잘라 앱에 넣어요:
    ```bash
@@ -27,110 +27,127 @@ ChatGPT(이미지 생성), Gemini, Midjourney 어디서든 쓸 수 있게 영어
 
 ---
 
-## 2. 공통 프롬프트 (매번 맨 앞에 붙이기)
+## 2. 그림 현황
 
-```
-Use the attached image as the exact style and character reference.
-Same pixel art style, same character (same face, hair, glasses, clothes),
-same desk with a thin beige monitor and keyboard, same beige office chair,
-same cream checkered background, same side view facing left.
-
-Layout: one image split into two panels side by side, like the reference.
-Left panel labeled "(X)" in red at the top, right panel labeled "(O)" in green at the top.
-Both panels the same size, the character at the same position and scale in both.
-No other text, no title, no speech bubbles, no watermark.
-Pixel art with crisp square pixels, no blur, no smooth gradients, no 3D.
-```
-
-### 캐릭터 고정 문장 (공통 프롬프트 바로 뒤에 하나 붙이기)
-
-| 캐릭터 | 문장 |
-|---|---|
-| 여성 (f) | `Character: young woman with brown hair in a messy top bun, round glasses, blue-gray hoodie, dark blue jeans, white sneakers.` |
-| 남성 (m) | `Character: young man with short brown hair, light blue-gray suit jacket, white shirt, dark red tie, navy pants, brown shoes.` |
-
-> 첫 결과에서 얼굴이 달라지면 "Keep the face exactly like the reference" 를 덧붙이고 다시 요청하세요.
+| 단계 | 동작 id | 동작 | 여성(f) | 남성(m) |
+|---|---|---|---|---|
+| 1 | `eye_far` | 먼 곳 보기 | ⬜ | ⬜ |
+| 2 | `chin_tuck` | 턱 당기기 | ✅ 기본 그림 | ✅ 기본 그림 |
+| 3 | `shoulder_open` | 어깨 펴기 | ⬜ | ⬜ |
+| 4 | `neck_side` | 목 옆 늘리기 | ✅ | ✅ |
+| 5 | `scapula_squeeze` | 날개뼈 모으기 | ✅ | ✅ |
+| 6 | `seat_back` | 의자 위 허리 세우기 | ⬜ | ⬜ |
+| 7 | `ankle_pump` | 발목 펌프 | ⬜ | ⬜ |
+| 8 | `stand_water` | 일어나서 물 마시기 | ⬜ | ⬜ |
+| 대체 | `glute_squeeze` | 엉덩이 힘주기 ("지금 못 일어나요") | ⬜ | ⬜ |
 
 ---
 
-## 3. 동작별 프롬프트
+## 3. 프롬프트 (복사해서 쓰기)
 
-왼쪽 (X) = **하기 전 / 나쁜 자세**, 오른쪽 (O) = **동작 중 / 바른 자세**예요.
-`{동작id}`는 자르기 스크립트에 넣을 이름이에요.
+요청 한 번에 **[A] 공통 + [B] 캐릭터 + [C] 동작** 세 덩어리를 순서대로 붙여 넣으세요.
+그리고 **이미 만든 목 옆 늘리기 그림(같은 캐릭터)을 첨부**하세요. 구도가 같아야 자르기 상자가 그대로 맞아요.
 
-### 자세 체크
+### [A] 공통 (매번 그대로)
 
-#### `shoulder_open` — 어깨 펴기
 ```
-Left (X): sitting at the desk typing, shoulders rolled forward and hunched up toward the ears,
-upper back rounded, tense face with small stress lines.
-Right (O): sitting upright with hands still on the keyboard, shoulders rolled back and down,
-chest open, relaxed calm smile.
-```
-
-### 스트레칭
-
-#### `neck_side` — 목 옆 늘리기
-```
-Left (X): sitting at the desk, stiff neck, one hand rubbing the back of the neck, tired face.
-Right (O): sitting upright, turned slightly toward the viewer, head gently tilted to the right,
-right hand resting on the left side of the head, left arm relaxed down,
-eyes closed and relaxed, two small curved motion lines on the left side of the neck.
+Use the attached image as the exact reference for art style, character, layout and framing.
+Make a new image in the same format: one wide image split into two panels side by side.
+Left panel has "(X)" in red at the upper-left, right panel has "(O)" in green at the upper-left,
+exactly where they are in the reference.
+Same pixel art style with crisp square pixels, same cream checkered background,
+same beige desk with a thin beige monitor and keyboard on the left, same beige office chair,
+character in side view facing left, same size and same position as in the reference.
+Keep the character's head in the same height area as the reference and the feet near the bottom.
+No other text, no title, no speech bubbles, no logo, no watermark, no sparkle mark.
 ```
 
-#### `scapula_squeeze` — 날개뼈 모으기
+### [B] 캐릭터 (하나만 고르기)
+
+| 캐릭터 | 붙일 문장 |
+|---|---|
+| 여성 (f) | `Character: the same young woman — brown hair in a messy top bun, round glasses, gray-blue hoodie, dark blue jeans, white sneakers.` |
+| 남성 (m) | `Character: the same young man — short brown hair, gray-blue suit jacket, white shirt, dark red tie, navy pants, brown shoes.` |
+
+### [C] 동작
+
+#### 1단계 `eye_far` — 먼 곳 보기
 ```
-Left (X): sitting hunched forward with arms hanging toward the keyboard, back rounded.
-Right (O): sitting upright away from the keyboard, elbows bent in a W shape and pulled back
-beside the torso, shoulder blades squeezed together, chest pushed forward,
-two small arrows on the back pointing toward the spine.
+Left (X): leaning close to the monitor, squinting with tired dry eyes, small red lines in the eyes,
+face only a short distance from the screen.
+Right (O): sitting upright in the chair, head turned away from the monitor toward the right side,
+looking far into the distance, relaxed open eyes, a small pixel window frame
+with a green tree and blue sky at the right edge of the panel.
 ```
 
-#### `neck_back` — 목 뒤 늘리기 (동작 추가 시)
+#### 3단계 `shoulder_open` — 어깨 펴기
 ```
-Left (X): sitting with the head pushed forward toward the monitor, neck tense.
-Right (O): sitting upright, hands clasped behind the head, head gently bowed forward,
-elbows pointing forward, relaxed face, small motion lines on the back of the neck.
+Left (X): typing with shoulders rolled forward and hunched up toward the ears,
+upper back rounded, chest closed, tense face with small stress lines.
+Right (O): sitting upright with hands resting on the keyboard, shoulders rolled back and down,
+chest open, shoulders clearly lower and away from the ears, two small curved arrows
+showing the shoulders rolling backward, relaxed smile.
 ```
 
-### 일어나기 / 눈
-
-#### `stand_water` — 일어나서 물 마시기
+#### 6단계 `seat_back` — 의자 위 허리 세우기
 ```
-Left (X): slumped deep in the chair, a small pixel clock icon above the head showing 2 hours,
-sleepy tired face.
-Right (O): standing next to the chair holding a small paper cup of water,
+Left (X): sliding forward on the chair, sitting only on the front edge of the seat,
+lower back rounded, a clear empty gap between the back and the backrest, slouching.
+Right (O): hips pushed all the way to the back of the seat, back touching the backrest,
+spine upright with a gentle natural curve in the lower back, one small arrow pointing
+from the hips toward the backrest.
+```
+
+#### 7단계 `ankle_pump` — 발목 펌프
+```
+Left (X): sitting still with feet flat on the floor, legs stiff, a few small gray "zzz" pixels
+next to the calves, bored face.
+Right (O): sitting upright, toes lifted up with heels on the floor, small up-and-down arrows
+next to the feet, small motion lines around the ankles, alert face.
+```
+
+#### 8단계 `stand_water` — 일어나서 물 마시기
+```
+Left (X): slumped deep in the chair after sitting too long, a small pixel clock icon
+above the head, sleepy tired face.
+Right (O): standing next to the chair (the chair is empty), holding a small paper cup of water,
 the other hand on the lower back, leaning slightly backward, refreshed smile.
+The standing character is the same scale as the sitting one, and the whole body fits in the panel.
+```
+> 서 있는 그림은 머리가 다른 그림보다 위로 올라가요. 머리가 잘리면 자를 때 `--boxes`의 위쪽 값(420)을 줄이세요 (예: `300`).
+
+#### 대체 `glute_squeeze` — 엉덩이 힘주기
+```
+Left (X): slumped sleepy in the chair, small "zzz" pixels above the head.
+Right (O): sitting upright with a determined face, fists lightly clenched on the thighs,
+small yellow pixel spark lines around the hips showing the muscles engaging.
 ```
 
-#### `eye_far` — 먼 곳 보기
+### 완성 예시 (6단계, 여성)
+
 ```
-Left (X): leaning close to the monitor with dry squinting eyes, small red lines in the eyes.
-Right (O): sitting upright turned away from the monitor, looking out a small pixel window
-with a green tree and blue sky, relaxed eyes, small sparkle near the eyes.
+Use the attached image as the exact reference for art style, character, layout and framing.
+Make a new image in the same format: one wide image split into two panels side by side.
+Left panel has "(X)" in red at the upper-left, right panel has "(O)" in green at the upper-left,
+exactly where they are in the reference.
+Same pixel art style with crisp square pixels, same cream checkered background,
+same beige desk with a thin beige monitor and keyboard on the left, same beige office chair,
+character in side view facing left, same size and same position as in the reference.
+Keep the character's head in the same height area as the reference and the feet near the bottom.
+No other text, no title, no speech bubbles, no logo, no watermark, no sparkle mark.
+Character: the same young woman — brown hair in a messy top bun, round glasses, gray-blue hoodie, dark blue jeans, white sneakers.
+Left (X): sliding forward on the chair, sitting only on the front edge of the seat,
+lower back rounded, a clear empty gap between the back and the backrest, slouching.
+Right (O): hips pushed all the way to the back of the seat, back touching the backrest,
+spine upright with a gentle natural curve in the lower back, one small arrow pointing
+from the hips toward the backrest.
 ```
 
-### 앉아서 하는 대체 동작 (2시간+ 착석용)
+### 받은 뒤 넣는 법
 
-#### `ankle_pump` — 발목 펌프
-```
-Left (X): sitting still, feet flat on the floor, legs stiff, small gray "zzz" near the legs.
-Right (O): sitting upright, toes lifted with heels on the floor, small up-and-down arrows next to the feet,
-alert face.
-```
-
-#### `seat_back` — 의자 위 허리 세우기
-```
-Left (X): sliding forward on the chair, sitting on the edge of the seat, lower back rounded,
-a gap between the back and the backrest.
-Right (O): hips pushed all the way to the back of the chair, back touching the backrest,
-spine upright with a gentle curve in the lower back.
-```
-
-#### `glute_squeeze` — 엉덩이 힘주기
-```
-Left (X): slumped sleepy on the chair, small "zzz" above the head.
-Right (O): sitting upright with a determined face, small yellow pixel spark lines near the hips.
+`inbox/`에 넣고 알려주시면 제가 넣을게요. 직접 하려면 (2400×1792 그림 기준):
+```bash
+uv run --with pillow python tools/crop_pair.py inbox/그림.png seat_back f --erase-labels --boxes "110,420,1090,1690;1250,420,2230,1690"
 ```
 
 ---
@@ -140,11 +157,11 @@ Right (O): sitting upright with a determined face, small yellow pixel spark line
 캐릭터 일관성을 더 높이고 싶으면 한 장에 여러 줄로 요청할 수 있어요. 단, 칸이 많을수록 칸 하나의 해상도가 떨어져요.
 
 ```
-[공통 프롬프트] [캐릭터 문장]
+[A] 공통 + [B] 캐릭터
 Instead of one pair, make a grid with 3 rows and 2 columns, each row is one (X)/(O) pair:
-row 1: neck side stretch
-row 2: shoulder blade squeeze
-row 3: stand up with a cup of water
+row 1: shoulders rolled forward (X) / shoulders back and down (O)
+row 2: sitting on the chair edge (X) / hips to the backrest (O)
+row 3: feet flat and still (X) / toes lifted, ankle pump (O)
 Thin gray lines between cells.
 ```
 → 이 경우 자르기 스크립트에 `--rows 3`을 주면 줄마다 잘라줘요 (아래 참고).
@@ -158,5 +175,7 @@ uv run --with pillow python tools/crop_pair.py 받은그림.png neck_side f
 ```
 - 그림을 **왼쪽/오른쪽 반**으로 나누고, 위쪽 (X)/(O) 글자 부분을 잘라낸 뒤 저장해요.
 - 글자가 남거나 머리가 잘리면 `--top 0.12` (위에서 잘라낼 비율, 기본 0.14)를 조절하세요.
-- 여러 줄 그림: `--rows 3 --names neck_side,scapula_squeeze,stand_water`
+- 여러 줄 그림: `--rows 3 --names shoulder_open,seat_back,ankle_pump`
+- `--erase-labels`: 각 칸 왼쪽 위의 (X)/(O) 글자를 240px 위 배경 무늬로 덮어서 지워요 (글자가 머리 높이에 있을 때).
+- `--boxes "x0,y0,x1,y1;x0,y0,x1,y1"`: ✕칸·○칸 자를 상자를 직접 지정해요. 2400×1792 그림은 `"110,420,1090,1690;1250,420,2230,1690"`.
 - 캐릭터를 빼면(`f`/`m` 생략) 캐릭터 공통 그림(`{동작id}_bad.png`)으로 저장해요.
