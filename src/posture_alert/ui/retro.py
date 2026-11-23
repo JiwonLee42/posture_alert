@@ -25,8 +25,15 @@ def retro_font(px: int = 12, bold: bool = False) -> QFont:
     f.setFamilies(FONT_FAMILIES)
     f.setPixelSize(px)
     f.setBold(bold)
-    f.setStyleStrategy(QFont.StyleStrategy.NoAntialias)
+    if _has_pixel_font():
+        # 픽셀 폰트일 때만 계단 현상 그대로 (일반 한글 폰트는 끄면 글자가 깨짐)
+        f.setStyleStrategy(QFont.StyleStrategy.NoAntialias)
     return f
+
+
+def _has_pixel_font() -> bool:
+    families = set(QFontDatabase.families())
+    return any(name in families for name in FONT_FAMILIES[:2])
 
 
 def _raised(w=2):
@@ -93,6 +100,24 @@ WARNING = [
     " KOOOOOOOOOOOOK ",
     "KKKKKKKKKKKKKKKK",
 ]
+ERROR_ICON = [
+    "    KKKKKK    ",
+    "  KKRRRRRRKK  ",
+    " KRRRRRRRRRRK ",
+    " KRWWRRRRWWRK ",
+    "KRRRWWRRWWRRRK",
+    "KRRRRWWWWRRRRK",
+    "KRRRRRWWRRRRDK",
+    "KRRRRRWWRRRRDK",
+    "KRRRRWWWWRRRDK",
+    "KRRRWWRRWWRDDK",
+    " KRWWRRRRWWDK ",
+    " KRRRRRRRRDDK ",
+    "  KKRDDDDDKK  ",
+    "    KKKKKK    ",
+]
+ERROR_PAL = {"K": "#5a0000", "R": "#e02020", "D": "#a00000", "W": "#ffffff"}
+
 WARNING_PAL = {"K": "#111111", "Y": "#f2e626", "O": "#e8b923", "W": "#fff7b0", "D": "#2b2b2b"}
 
 # 임시 자세 그림 (옆모습). 생성한 픽셀 이미지로 교체될 자리
