@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QProgressBar,
                                QPushButton, QVBoxLayout, QWidget)
 
 from ..engine.billing import DISCLAIMER, Receipt, price_of, won
-from ..engine.content import APP_NAME, Exercise, Message
+from ..engine.content import APP_NAME, APP_TAGLINE, Exercise, Message
 from .retro import (BAD_POSE, CHECK_ICON, CHECK_PAL, CHECKBOX_OFF, CHECKBOX_ON,
                     CHECKBOX_PAL, DARK, ERROR_ICON, ERROR_PAL, GOOD_POSE, NAVY,
                     POSE_PAL, WARNING, WARNING_PAL, retro_font, sprite)
@@ -137,6 +137,20 @@ def _header(msg: Message, icon=ERROR_ICON, pal=ERROR_PAL, code: str = "") -> Hea
     return Header(row, icon_lb, title, body)
 
 
+def _tagline() -> QWidget:
+    """그림 위의 큰 타이틀: 기억하자 / 척추수술 3000만원 (레퍼런스 그림처럼 두 줄 가운데 정렬)."""
+    first, _, second = APP_TAGLINE.partition(" ")
+    box = QWidget()
+    v = QVBoxLayout(box)
+    v.setContentsMargins(0, 4, 0, 2)
+    v.setSpacing(2)
+    for text, px in ((first, 18), (second, 24)):
+        lb = _label(text, px, bold=True)
+        lb.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        v.addWidget(lb)
+    return box
+
+
 def _checkbox(on: bool) -> QPixmap:
     return sprite(CHECKBOX_ON if on else CHECKBOX_OFF, CHECKBOX_PAL, 2)
 
@@ -154,12 +168,15 @@ CHARACTERS = ("f", "m")  # assets/img/default/{f|m}_{bad|good}.png
 
 def pose_image(assets: Path, exercise_id: str, which: str, character: str = "f") -> QPixmap:
     """그림 고르는 순서:
-    1) assets/img/{동작id}_{good|bad}.png   (동작별 전용 그림)
-    2) assets/img/default/{f|m}_{good|bad}.png (기본 캐릭터: 거북목 ✕ / 바른 자세 ○)
-    3) 임시 픽셀 막대 인형
+    1) assets/img/{동작id}_{f|m}_{good|bad}.png (동작 + 캐릭터별 그림)
+    2) assets/img/{동작id}_{good|bad}.png      (동작별 그림, 캐릭터 공통)
+    3) assets/img/default/{f|m}_{good|bad}.png  (기본 캐릭터: 거북목 ✕ / 바른 자세 ○)
+    4) 임시 픽셀 막대 인형
     """
-    for f in (assets / "img" / f"{exercise_id}_{which}.png",
-              assets / "img" / "default" / f"{character}_{which}.png"):
+    img = assets / "img"
+    for f in (img / f"{exercise_id}_{character}_{which}.png",
+              img / f"{exercise_id}_{which}.png",
+              img / "default" / f"{character}_{which}.png"):
         if f.exists():
             return QPixmap(str(f)).scaled(IMG_W, IMG_H, Qt.AspectRatioMode.KeepAspectRatio,
                                           Qt.TransformationMode.SmoothTransformation)
@@ -174,14 +191,18 @@ def image_panel(pm: QPixmap, caption: str) -> QWidget:
     frame = QFrame()
     frame.setObjectName("sunken")
     frame.setFixedSize(IMG_W + 8, IMG_H + 8)
-    img = QLabel(frame)
+    fl = QVBoxLayout(frame)
+    fl.setContentsMargins(4, 4, 4, 4)
+    img = QLabel()
     img.setPixmap(pm)
     img.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    img.setGeometry(4, 4, IMG_W, IMG_H)
+    fl.addWidget(img)
     cap = _label(caption, 12, bold=True)
     cap.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    cap.setMinimumHeight(18)
     v.addWidget(frame)
     v.addWidget(cap)
+    box.setFixedHeight(IMG_H + 8 + 4 + 20)  # 그림 + 간격 + 캡션 (레이아웃이 줄이지 못하게)
     return box
 
 
@@ -203,6 +224,8 @@ class GuideCard(_RetroWindow):
         self.price = price
         self.header = _header(msg, code=code)
         self.body.addLayout(self.header.layout)
+
+        self.body.addWidget(_tagline())
 
         imgs = QHBoxLayout()
         imgs.addStretch()
@@ -406,7 +429,7 @@ class ReceiptWindow(_RetroWindow):
     def _render(cls, r: Receipt, now: datetime) -> str:
         w = cls.WIDTH
         days = "월화수목금토일"
-        out = [f"{APP_NAME} 견적서".center(w - 6), f"{now:%Y-%m-%d} ({days[now.weekday()]}) {now:%H:%M}".center(w),
+        out = [f"{APP_NAME} 견적서".center(w - 6), APP_TAGLINE.center(w - 8), f"{now:%Y-%m-%d} ({days[now.weekday()]}) {now:%H:%M}".center(w),
                "-" * w, "[방어 내역]"]
         out += [f"{l.name} x{l.count}  {won(l.amount)}" for l in r.saved] or ["  (없음)"]
         out += ["", "[청구 내역]"]

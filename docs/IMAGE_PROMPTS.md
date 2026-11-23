@@ -1,113 +1,162 @@
 # 픽셀 이미지 생성 프롬프트
 
-레퍼런스 느낌: **Windows 95/XP 오류 창 + 픽셀 경고 아이콘**. 그 창 안에 들어갈 **자세 그림**을 같은 픽셀 스타일로 만듭니다.
+기준 그림: **"기억하자 척추수술 3000만원"** (여성·남성 캐릭터의 ✕ 거북목 / ○ 바른 자세 두 장).
+스트레칭·일어나기 동작 그림도 **같은 캐릭터, 같은 구도, 같은 배경**으로 만들어야 알림 창 안에서 자연스럽게 이어집니다.
 
-ChatGPT(이미지 생성), Gemini, Midjourney 어디서든 쓸 수 있게 영어 프롬프트로 정리했어요. (이미지 생성 모델은 영어 프롬프트에서 스타일이 더 안정적이에요.)
-
----
-
-## 1. 앱에 넣는 방법
-
-> **현재 기본 그림**: `assets/img/default/{f|m}_{bad|good}.png` — "기억하자 척추수술 3000만원" 그림에서 잘라낸 여성(f)·남성(m) 캐릭터의 거북목(✕)/바른 자세(○). 동작별 전용 그림이 없으면 이 그림이 나오고, 알림마다 두 캐릭터가 번갈아 나옵니다. (`POSTURE_CHARACTER=f` 또는 `m`으로 고정 가능)
-
-- 파일 위치: `src/posture_alert/assets/img/`
-- 파일 이름: `{동작 id}_bad.png` (✕ 지금), `{동작 id}_good.png` (○ 이렇게)
-- 파일이 있으면 앱이 자동으로 그 그림을 쓰고, 없으면 지금의 임시 막대 인형을 보여줘요.
-- 권장 크기: **128×128 px, 배경 투명 PNG**
-  - 생성 이미지는 보통 1024px로 나오니, 줄일 때 **"최근접 이웃(Nearest Neighbor)"** 방식으로 줄여야 픽셀이 뭉개지지 않아요.
-  - 예: `magick in.png -filter point -resize 128x128 out.png` (ImageMagick)
+ChatGPT(이미지 생성), Gemini, Midjourney 어디서든 쓸 수 있게 영어 프롬프트로 정리했어요. 이미지 생성 모델은 영어 프롬프트에서 스타일이 더 안정적이에요.
 
 ---
 
-## 2. 공통 스타일 프롬프트 (모든 이미지 앞에 붙이기)
+## 1. 만드는 순서 (요약)
 
-같은 캐릭터가 계속 나와야 하니, 아래 문장을 **매번 그대로** 앞에 붙이세요.
+1. 이미지 생성 도구에 **기준 그림을 첨부**해요 (여성 캐릭터면 여성 그림, 남성이면 남성 그림).
+2. 아래 **2장의 공통 프롬프트** + **3장의 동작 프롬프트**를 붙여서 요청해요.
+   → 기준 그림처럼 **왼쪽 (X) / 오른쪽 (O) 두 칸**짜리 그림이 나와요.
+3. 받은 그림을 자르기 스크립트로 잘라 앱에 넣어요:
+   ```bash
+   uv run --with pillow python tools/crop_pair.py 받은그림.png neck_side f
+   ```
+   → `assets/img/neck_side_f_bad.png`, `assets/img/neck_side_f_good.png` 가 생겨요.
+4. `uv run posture-alert --demo stretch`로 확인해요.
+
+### 앱이 그림을 고르는 순서
+1. `assets/img/{동작id}_{f|m}_{bad|good}.png` — 동작 + 캐릭터별 그림
+2. `assets/img/{동작id}_{bad|good}.png` — 동작별 그림 (캐릭터 공통)
+3. `assets/img/default/{f|m}_{bad|good}.png` — 기본 거북목 그림 (지금 들어 있는 것)
+4. 임시 픽셀 막대 인형
+
+---
+
+## 2. 공통 프롬프트 (매번 맨 앞에 붙이기)
 
 ```
-16-bit pixel art, retro Windows 95 era aesthetic, chunky pixels on a 64x64 grid,
-limited palette (max 16 colors), clean 1px black outline, flat shading with one highlight tone,
-no anti-aliasing, no gradients, transparent background, centered, side view.
-Character: a cute gender-neutral office worker with short dark brown hair,
-round peach skin face, simple dot eye, blue sweater, dark gray pants,
-sitting on a simple gray office chair in front of a small beige CRT-style monitor.
-Same character design in every image.
+Use the attached image as the exact style and character reference.
+Same pixel art style, same character (same face, hair, glasses, clothes),
+same desk with a thin beige monitor and keyboard, same beige office chair,
+same cream checkered background, same side view facing left.
+
+Layout: one image split into two panels side by side, like the reference.
+Left panel labeled "(X)" in red at the top, right panel labeled "(O)" in green at the top.
+Both panels the same size, the character at the same position and scale in both.
+No other text, no title, no speech bubbles, no watermark.
+Pixel art with crisp square pixels, no blur, no smooth gradients, no 3D.
 ```
 
-> 첫 이미지가 마음에 들면, 다음 이미지부터는 그 이미지를 **레퍼런스로 첨부**하고 "same character, same style"을 붙이면 일관성이 훨씬 좋아져요.
+### 캐릭터 고정 문장 (공통 프롬프트 바로 뒤에 하나 붙이기)
 
-**피할 것 (네거티브)** — Midjourney는 `--no`, 다른 도구는 문장 끝에 "Avoid: ..."로:
-```
-Avoid: realistic, 3D render, smooth gradients, blurry, anti-aliased edges, text, watermark, extra limbs
-```
+| 캐릭터 | 문장 |
+|---|---|
+| 여성 (f) | `Character: young woman with brown hair in a messy top bun, round glasses, blue-gray hoodie, dark blue jeans, white sneakers.` |
+| 남성 (m) | `Character: young man with short brown hair, light blue-gray suit jacket, white shirt, dark red tie, navy pants, brown shoes.` |
+
+> 첫 결과에서 얼굴이 달라지면 "Keep the face exactly like the reference" 를 덧붙이고 다시 요청하세요.
 
 ---
 
 ## 3. 동작별 프롬프트
 
-각 동작마다 `_bad`(✕ 지금)와 `_good`(○ 이렇게) 두 장을 만듭니다.
-스트레칭처럼 "나쁜 자세"가 없는 동작은 `_bad` = **하기 전**, `_good` = **동작 중**으로 만들어요.
+왼쪽 (X) = **하기 전 / 나쁜 자세**, 오른쪽 (O) = **동작 중 / 바른 자세**예요.
+`{동작id}`는 자르기 스크립트에 넣을 이름이에요.
 
 ### 자세 체크
 
-| 파일 | 프롬프트 (공통 스타일 뒤에 붙이기) |
-|---|---|
-| `chin_tuck_bad.png` | `The character slouches with forward head posture: head and neck jutting far forward toward the monitor, ears clearly in front of the shoulders, rounded upper back. A small red pixel "X" mark floats near the neck.` |
-| `chin_tuck_good.png` | `The character sits upright doing a chin tuck: chin gently pulled back making a slight double chin, ear aligned directly above the shoulder, straight back. A small green pixel check mark floats near the head. A faint dotted vertical line passes through ear and shoulder.` |
-| `shoulder_open_bad.png` | `The character sits with rounded shoulders rolled forward and inward, chest closed, shoulders raised toward the ears, looking tense.` |
-| `shoulder_open_good.png` | `The character sits with shoulders rolled back and down, chest open, shoulders relaxed and far from the ears, calm smile.` |
+#### `shoulder_open` — 어깨 펴기
+```
+Left (X): sitting at the desk typing, shoulders rolled forward and hunched up toward the ears,
+upper back rounded, tense face with small stress lines.
+Right (O): sitting upright with hands still on the keyboard, shoulders rolled back and down,
+chest open, relaxed calm smile.
+```
 
 ### 스트레칭
 
-| 파일 | 프롬프트 |
-|---|---|
-| `neck_side_bad.png` | `The character sits upright, neutral pose, right hand resting on the desk, before stretching.` |
-| `neck_side_good.png` | `The character, front view instead of side view, gently tilts the head to the right with the right hand resting on the left side of the head, left arm relaxed down, eyes closed and relaxed. Small curved motion lines on the left side of the neck.` |
-| `scapula_squeeze_bad.png` | `The character sits hunched with arms hanging forward, shoulder blades spread apart, back view.` |
-| `scapula_squeeze_good.png` | `Back view: the character squeezes the shoulder blades together, elbows bent in a W shape pulled back beside the torso, chest pushed forward, two small arrows pointing toward the spine.` |
+#### `neck_side` — 목 옆 늘리기
+```
+Left (X): sitting at the desk, stiff neck, one hand rubbing the back of the neck, tired face.
+Right (O): sitting upright, turned slightly toward the viewer, head gently tilted to the right,
+right hand resting on the left side of the head, left arm relaxed down,
+eyes closed and relaxed, two small curved motion lines on the left side of the neck.
+```
+
+#### `scapula_squeeze` — 날개뼈 모으기
+```
+Left (X): sitting hunched forward with arms hanging toward the keyboard, back rounded.
+Right (O): sitting upright away from the keyboard, elbows bent in a W shape and pulled back
+beside the torso, shoulder blades squeezed together, chest pushed forward,
+two small arrows on the back pointing toward the spine.
+```
+
+#### `neck_back` — 목 뒤 늘리기 (동작 추가 시)
+```
+Left (X): sitting with the head pushed forward toward the monitor, neck tense.
+Right (O): sitting upright, hands clasped behind the head, head gently bowed forward,
+elbows pointing forward, relaxed face, small motion lines on the back of the neck.
+```
 
 ### 일어나기 / 눈
 
-| 파일 | 프롬프트 |
-|---|---|
-| `stand_water_bad.png` | `The character has been sitting too long, slumped deep in the chair, a small pixel clock icon above the head showing 2 hours.` |
-| `stand_water_good.png` | `The character stands up next to the chair holding a small paper cup of water, the other hand on the lower back, leaning slightly backward, refreshed expression.` |
-| `eye_far_good.png` | `The character sits turned away from the monitor, looking out a small pixel window with a distant green tree and blue sky, relaxed eyes.` |
+#### `stand_water` — 일어나서 물 마시기
+```
+Left (X): slumped deep in the chair, a small pixel clock icon above the head showing 2 hours,
+sleepy tired face.
+Right (O): standing next to the chair holding a small paper cup of water,
+the other hand on the lower back, leaning slightly backward, refreshed smile.
+```
+
+#### `eye_far` — 먼 곳 보기
+```
+Left (X): leaning close to the monitor with dry squinting eyes, small red lines in the eyes.
+Right (O): sitting upright turned away from the monitor, looking out a small pixel window
+with a green tree and blue sky, relaxed eyes, small sparkle near the eyes.
+```
 
 ### 앉아서 하는 대체 동작 (2시간+ 착석용)
 
-| 파일 | 프롬프트 |
-|---|---|
-| `ankle_pump_bad.png` | `Close-up of the character's legs under the desk while seated, feet flat on the floor, still.` |
-| `ankle_pump_good.png` | `Close-up of the character's legs under the desk while seated, toes lifted up on one frame side and heels lifted on the other, small up-down arrows next to the feet.` |
-| `seat_back_bad.png` | `The character slides forward on the chair, sitting on the edge with the lower back rounded and a gap between the back and the backrest.` |
-| `seat_back_good.png` | `The character sits with hips pushed all the way to the back of the chair, lower back gently arched, back touching the backrest, upright.` |
-| `glute_squeeze_bad.png` | `The character sits slumped and sleepy on the chair, small "zzz" pixels above the head.` |
-| `glute_squeeze_good.png` | `The character sits upright with a determined face, small yellow pixel spark lines near the hips showing muscle engagement.` |
+#### `ankle_pump` — 발목 펌프
+```
+Left (X): sitting still, feet flat on the floor, legs stiff, small gray "zzz" near the legs.
+Right (O): sitting upright, toes lifted with heels on the floor, small up-and-down arrows next to the feet,
+alert face.
+```
+
+#### `seat_back` — 의자 위 허리 세우기
+```
+Left (X): sliding forward on the chair, sitting on the edge of the seat, lower back rounded,
+a gap between the back and the backrest.
+Right (O): hips pushed all the way to the back of the chair, back touching the backrest,
+spine upright with a gentle curve in the lower back.
+```
+
+#### `glute_squeeze` — 엉덩이 힘주기
+```
+Left (X): slumped sleepy on the chair, small "zzz" above the head.
+Right (O): sitting upright with a determined face, small yellow pixel spark lines near the hips.
+```
 
 ---
 
-## 4. 아이콘 (선택)
+## 4. 한 번에 여러 동작 만들기 (선택)
 
-| 파일 | 용도 | 프롬프트 |
-|---|---|---|
-| `icon_warning.png` | 알림 창 왼쪽 경고 아이콘 | `16-bit pixel art warning sign: yellow triangle with thick black pixel outline and a black exclamation mark, small light-yellow highlight on the upper-left edge, darker orange shading on the right edge, transparent background, 32x32 grid.` |
-| `icon_turtle.png` | 거북목 알림 아이콘 | `16-bit pixel art cute green turtle head sticking far out of its shell, worried face, black 1px outline, transparent background, 32x32 grid, retro Windows 95 icon style.` |
-| `icon_app.png` | 트레이·exe 아이콘 | `16-bit pixel art app icon: a beige retro CRT monitor showing a small blue figure with a straight spine and a green check mark, black outline, transparent background, 32x32 grid, Windows 95 desktop icon style.` |
+캐릭터 일관성을 더 높이고 싶으면 한 장에 여러 줄로 요청할 수 있어요. 단, 칸이 많을수록 칸 하나의 해상도가 떨어져요.
 
-> 아이콘은 아직 코드에서 자동으로 읽지 않아요. 만들어 주시면 연결할게요.
+```
+[공통 프롬프트] [캐릭터 문장]
+Instead of one pair, make a grid with 3 rows and 2 columns, each row is one (X)/(O) pair:
+row 1: neck side stretch
+row 2: shoulder blade squeeze
+row 3: stand up with a cup of water
+Thin gray lines between cells.
+```
+→ 이 경우 자르기 스크립트에 `--rows 3`을 주면 줄마다 잘라줘요 (아래 참고).
 
 ---
 
-## 5. 한 번에 여러 장 뽑는 팁
+## 5. 자르기 스크립트 사용법
 
-- **스프라이트 시트**로 요청하면 캐릭터 일관성이 가장 좋아요:
-  ```
-  [공통 스타일 프롬프트]
-  A sprite sheet with 2 columns and 4 rows, each cell 64x64, same character in each cell:
-  row 1: forward head posture (bad) | chin tuck upright (good)
-  row 2: rounded shoulders (bad) | shoulders back and down (good)
-  row 3: slumped on chair edge (bad) | hips to backrest upright (good)
-  row 4: sitting still (before) | standing with a cup of water (after)
-  Thin 1px gray grid lines between cells.
-  ```
-- 받은 시트는 잘라서 파일 이름에 맞게 저장하면 돼요. (자르는 스크립트가 필요하면 말씀해 주세요.)
+```bash
+uv run --with pillow python tools/crop_pair.py 받은그림.png neck_side f
+```
+- 그림을 **왼쪽/오른쪽 반**으로 나누고, 위쪽 (X)/(O) 글자 부분을 잘라낸 뒤 저장해요.
+- 글자가 남거나 머리가 잘리면 `--top 0.12` (위에서 잘라낼 비율, 기본 0.14)를 조절하세요.
+- 여러 줄 그림: `--rows 3 --names neck_side,scapula_squeeze,stand_water`
+- 캐릭터를 빼면(`f`/`m` 생략) 캐릭터 공통 그림(`{동작id}_bad.png`)으로 저장해요.

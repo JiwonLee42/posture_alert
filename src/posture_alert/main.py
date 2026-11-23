@@ -16,7 +16,7 @@ from PySide6.QtGui import QColor, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from .engine.billing import build_receipt
-from .engine.content import (APP_NAME, APP_SUBTITLE, ASSETS, load_exercises,
+from .engine.content import (APP_NAME, APP_TAGLINE, ASSETS, load_exercises,
                              message_for, pick)
 from .engine.scheduler import Kind, Scheduler
 from .platform import get_monitor
@@ -60,7 +60,7 @@ class App:
         self._char_i = 0
 
         self.tray = QSystemTrayIcon(QIcon(sprite(ERROR_ICON, ERROR_PAL, 2)))
-        self.tray.setToolTip(f"{APP_NAME} - {APP_SUBTITLE}")
+        self.tray.setToolTip(f"{APP_NAME} - {APP_TAGLINE}")
         menu = QMenu()
         menu.addAction("오늘 견적서 보기", self.show_receipt)
         menu.addSeparator()
