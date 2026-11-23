@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write   # Release 만들기에 필요
+
 jobs:
   build:
     runs-on: windows-latest
@@ -29,3 +32,19 @@ jobs:
         with:
           name: posture-alert-windows
           path: dist/posture-alert
+
+      # main에 push할 때마다 v1.0.<실행번호> 태그를 붙여 Release 로 올린다
+      - name: Zip
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        run: Compress-Archive -Path dist/posture-alert -DestinationPath 척추수술3000-windows.zip
+
+      - name: Release
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "v1.0.${{ github.run_number }}" 척추수술3000-windows.zip
+          --title "척추수술3000 v1.0.${{ github.run_number }}"
+          --generate-notes --target ${{ github.sha }}
