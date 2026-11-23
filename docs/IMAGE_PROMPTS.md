@@ -17,7 +17,12 @@ ChatGPT(이미지 생성), Gemini, Midjourney 어디서든 쓸 수 있게 영어
    uv run --with pillow python tools/crop_pair.py 받은그림.png neck_side f
    ```
    → `assets/img/neck_side_f_bad.png`, `assets/img/neck_side_f_good.png` 가 생겨요.
-4. `uv run posture-alert --demo stretch`로 확인해요.
+4. 배경 체크무늬를 진짜 투명으로 바꿔요 (생성 도구는 "투명 배경"을 체크무늬 그림으로 그려 넣는 경우가 많아요):
+   ```bash
+   uv run --with pillow --with numpy python tools/transparent.py src/posture_alert/assets/img/neck_side_f_*.png
+   ```
+   가장자리와 이어진 배경 + 책상 밑처럼 갇혀 있어도 체크무늬 두 색이 섞인 넓은 영역만 지워요. 옷·신발의 밝은 색은 남아요.
+5. `uv run posture-alert --demo 4`로 확인해요.
 
 ### 앱이 그림을 고르는 순서
 1. `assets/img/{동작id}_{f|m}_{bad|good}.png` — 동작 + 캐릭터별 그림

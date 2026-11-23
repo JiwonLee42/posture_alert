@@ -16,15 +16,14 @@ from PySide6.QtCore import QPoint, QStandardPaths, QTimer
 from PySide6.QtGui import QColor, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
-from .engine.billing import build_receipt
-from .engine.content import (APP_NAME, APP_TAGLINE, ASSETS, Message, load_exercises,
-                             message_for, pick)
+from .engine.billing import build_receipt, remaining
+from .engine.content import APP_NAME, APP_TAGLINE, ASSETS, load_exercises, pick
 from .engine.stages import STAGES, Stage, StageCycle
 from .engine.uptime import UptimeCounter
 from .engine.scheduler import Kind, Scheduler
 from .platform import get_monitor
 from .storage.repo import Repo
-from .ui.popup import CHARACTERS, GhostError, GuideCard, LightToast, ReceiptWindow
+from .ui.popup import CHARACTERS, GhostError, GuideCard, LightToast, Onboarding, ReceiptWindow
 from .ui.retro import ERROR_ICON, ERROR_PAL, STYLESHEET, load_fonts, sprite
 
 
@@ -43,6 +42,8 @@ def data_path() -> Path:
 IGNORED = {"skip", "snooze", "timeout"}
 MAX_GHOSTS = 6
 CYCLE_EVERY_MINUTES = float(os.environ.get("POSTURE_EVERY", "20"))  # 단계 하나당 간격
+# 종료할 때 DB 기록을 모두 지움 (POSTURE_KEEP_DATA=1 이면 남김)
+RESET_ON_EXIT = os.environ.get("POSTURE_KEEP_DATA") != "1"
 
 
 class App:
@@ -59,9 +60,12 @@ class App:
         self.receipt_win = None
         self.ignored_streak = 0   # 연속으로 무시한 횟수 → 에러창이 그만큼 쌓인다
         self._seq = 0
-        # 기본 캐릭터: POSTURE_CHARACTER=f|m 으로 고정, 없으면 알림마다 번갈아
+        # 캐릭터: POSTURE_CHARACTER=f|m 이 있으면 그걸, 아니면 처음 실행 때 고른 값
         self.character_pref = os.environ.get("POSTURE_CHARACTER")
-        self._char_i = 0
+        self.onboarding = None
+        # 닫힌 창은 Qt 가 실제로 지울 때(destroyed)까지 붙잡아 둔다.
+        # 닫자마자 Python 참조를 끊으면 Python 이 먼저 지워서 크래시 ("shared QObject was deleted directly")
+        self._alive: set = set()
 
         # 켜둔 시간: 메모리 카운터 + 분이 바뀔 때만 sessions 행에 UPDATE
         self.session_id = self.repo.start_session()
@@ -91,12 +95,20 @@ class App:
         self.uptime_timer = QTimer()
         self.uptime_timer.timeout.connect(self.on_uptime)
         self.uptime_timer.start(10_000)
-        qapp.aboutToQuit.connect(self.shutdown)
+        qapp.aboutToQuit.connect(self.on_quit)
+
+        if not self.started:
+            QTimer.singleShot(0, self.show_onboarding)
 
     # --- 켜둔 시간 ---
     def on_uptime(self):
         if self.uptime.poll() is not None:
             self.save_uptime()
+
+    def on_quit(self):
+        self.shutdown()
+        if RESET_ON_EXIT:
+            self.repo.reset()
 
     def shutdown(self):
         """타이머·창·트레이 정리 (종료 시, 테스트 정리용)."""
@@ -106,6 +118,8 @@ class App:
         if self.card is not None:
             self.card.close()
         self._close_ghosts()
+        if self.onboarding is not None:
+            self.onboarding.close()
         self.tray.hide()
         self.tray.setContextMenu(None)
 
@@ -123,7 +137,7 @@ class App:
         # 30분 이상 앉아 있다가 자리를 비웠으면 "일어남"으로 방어 처리
         if self.scheduler.sitting_since is None and was_sitting >= timedelta(minutes=30) / self.speed:
             self.repo.record(Kind.STAND.value, None, "away")
-        if kind is None or self.card is not None:  # 이미 떠 있으면 겹쳐 띄우지 않음
+        if kind is None or self.card is not None or not self.started:  # 시작 전·이미 떠 있으면 안 띄움
             return
         if kind is Kind.STAND:
             self.show_stage(Stage.STAND_WATER, interrupt=True)  # 오래 앉았으면 끼어들기
@@ -146,8 +160,36 @@ class App:
     def character(self) -> str:
         if self.character_pref in CHARACTERS:
             return self.character_pref
-        self._char_i += 1
-        return CHARACTERS[self._char_i % len(CHARACTERS)]
+        return self.repo.get_setting("character", "f")
+
+    @property
+    def started(self) -> bool:
+        return self.repo.get_setting("character") is not None
+
+    def remaining(self) -> int:
+        """시작한 뒤의 기록으로 계산한 남은 수술비 (3,000만원 → 0원)."""
+        return remaining(self.repo.events_since(self.repo.get_setting("started_at")))
+
+    # --- 처음 실행: 캐릭터 고르기 → 시작 ---
+    def _retain(self, w):
+        self._alive.add(w)
+        w.destroyed.connect(lambda *_, w=w: self._alive.discard(w))
+        return w
+
+    def show_onboarding(self):
+        if self.started or self.onboarding is not None:  # 그 사이 이미 시작했으면 안 띄움
+            return
+        self.onboarding = self._retain(Onboarding(self.assets))
+        self.onboarding.finished.connect(self._on_started)
+        self.onboarding.center()
+        self.onboarding.show()
+
+    def _on_started(self, character: str):
+        self.repo.set_setting("character", character)
+        self.repo.set_setting("started_at", datetime.now().isoformat(timespec="seconds"))
+        if self.onboarding is not None:
+            self.onboarding.close()  # _alive 가 붙잡고 있다가 destroyed 때 놓음
+        self.onboarding = None
 
     def receipt(self):
         return build_receipt(self.repo.events_today())
@@ -159,21 +201,15 @@ class App:
             self.cycle.cycle_no = self.repo.new_cycle(self.session_id)
         info = STAGES[stage]
         kind = Kind(info.kind)
-        now = datetime.now()
-        if interrupt:  # 오래 앉아서 끼어든 일어나기: 앉아 있던 시간 멘트
-            msg = message_for(Kind.STAND, now, self.scheduler.sitting_minutes(now))
-        else:
-            msg = Message(info.title, info.body)
         ex = pick(list(self.exercises.values()), "seated_alt") if alt else self.exercises[info.exercise_id]
         cycle_no = self.cycle.cycle_no
-        cycle_info = (cycle_no, stage, self.repo.cycle_checks(cycle_no))
+        left = self.remaining()
 
         if kind is Kind.EYE:
-            card = LightToast(msg, ex)
+            card = LightToast(ex, left)
         else:
-            card = GuideCard(msg, ex, kind.value, self.assets, receipt=self.receipt(),
-                             can_defer_stand=(kind is Kind.STAND and not alt),
-                             character=self.character, cycle=cycle_info)
+            card = GuideCard(ex, kind.value, self.assets, left, character=self.character,
+                             can_defer_stand=(kind is Kind.STAND and not alt))
         # POST: 알림을 띄우는 순간 기록 생성 (result='shown', completed=0)
         event_id = self.repo.create_event(kind.value, ex.id, stage=stage, cycle_id=cycle_no)
         if kind is not Kind.EYE:
@@ -182,14 +218,14 @@ class App:
         self._seq += 1
         seq = self._seq
         card.destroyed.connect(lambda *_: self._clear(seq))
-        self.card = card
+        self.card = self._retain(card)
 
         # 무시할수록 에러창이 왼쪽 위로 겹겹이 쌓인다 (레퍼런스의 에러 폭탄 느낌)
         base = card.bottom_right()
         self._close_ghosts()
         n = min(self.ignored_streak, MAX_GHOSTS)
         for i in range(n, 0, -1):
-            g = GhostError(i)
+            g = self._retain(GhostError(i))
             g.show_at(base - QPoint(26 * i, 26 * i))
             self.ghosts.append(g)
         card.show_at(base)
@@ -231,7 +267,7 @@ class App:
             except RuntimeError:
                 pass
         self.save_uptime()
-        self.receipt_win = ReceiptWindow(self.receipt(), uptime_minutes=self.repo.uptime_today())
+        self.receipt_win = self._retain(ReceiptWindow(self.receipt(), uptime_minutes=self.repo.uptime_today()))
         self.receipt_win.show_at(self.receipt_win.bottom_right())
 
 
@@ -239,7 +275,8 @@ def save_shot(app: "App", out: str) -> None:
     """떠 있는 창들(겹친 에러창 포함)을 한 장의 이미지로 저장 (데모·문서용)."""
     from PySide6.QtCore import QRect
     from PySide6.QtGui import QPainter, QPixmap
-    wins = [w for w in [*app.ghosts, app.card, app.receipt_win] if w is not None and w.isVisible()]
+    wins = [w for w in [*app.ghosts, app.card, app.receipt_win, app.onboarding]
+            if w is not None and w.isVisible()]
     rect = QRect()
     for w in wins:
         rect = rect.united(w.frameGeometry())
@@ -265,30 +302,33 @@ def main() -> None:
     app = App(qapp, speed, repo=Repo(":memory:") if "--demo" in args else None)
 
     if "--demo" in args:
+        target = args[args.index("--demo") + 1]
         app.uptime.started -= 137 * 60  # 2시간 17분 켜둔 것처럼
-        for k, r in [("posture", "done")] * 4 + [("stretch", "done")] * 2 + \
-                    [("stand", "away"), ("eye", "done"), ("stand", "skip"), ("posture", "snooze")]:
-            app.repo.record(k, None, r)
+        if target != "onboarding":
+            # 시작한 상태 + 수술비 1,500만원 남은 상태로 (거북목 교정 15번 = -1,500만원)
+            app.repo.set_setting("character", app.character_pref or "f")
+            app.repo.set_setting("started_at", "2000-01-01T00:00:00")
+            for _ in range(15):
+                app.repo.record("posture", None, "done")
         app.cycle = StageCycle(app.repo.new_cycle(app.session_id))
         if "--ghosts" in args:
             app.ignored_streak = int(args[args.index("--ghosts") + 1])
-        target = args[args.index("--demo") + 1]
         demo_stage = {"eye": Stage.EYE_FAR, "posture": Stage.CHIN_TUCK,
                       "stretch": Stage.SCAPULA_SQUEEZE, "stand": Stage.STAND_WATER}
-        if target == "receipt":
+        if target == "onboarding":
+            if "--pick" in args:  # 두 번째 화면(시작할게요)까지 넘긴 상태
+                QTimer.singleShot(0, lambda: app.onboarding._picked(args[args.index("--pick") + 1]))
+        elif target == "receipt":
             app.show_receipt()
         else:
             stage = Stage(int(target)) if target.isdigit() else demo_stage[target]
-            for done in Stage:  # 앞 단계들은 했다고 체크해 둔 상태로
-                if done < stage:
-                    app.repo.mark_stage_done(app.cycle.cycle_no, done)
             app.cycle.position = stage
             app.show_stage(stage, interrupt=(target == "stand"))
-            if "--complete" in args:  # 완료 체크 화면 미리보기
+            if "--complete" in args:  # 했어요 누른 화면 미리보기
                 app.card._complete()
     if "--shot" in args:
         out = args[args.index("--shot") + 1]
-        QTimer.singleShot(300, lambda: (save_shot(app, out), qapp.quit()))
+        QTimer.singleShot(400, lambda: (save_shot(app, out), qapp.quit()))
 
     sys.exit(qapp.exec())
 

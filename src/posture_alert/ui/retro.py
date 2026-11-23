@@ -63,6 +63,11 @@ QPushButton:pressed {{
 }}
 QPushButton#primary {{ border:3px solid {BLACK}; }}
 QPushButton:disabled {{ color:{DARK}; }}
+QToolButton {{ background:{GRAY}; color:{BLACK}; {_raised()} padding:6px; }}
+QToolButton:pressed {{
+    border-top:2px solid {BLACK}; border-left:2px solid {BLACK};
+    border-bottom:2px solid {WHITE}; border-right:2px solid {WHITE};
+}}
 QPushButton#close {{ min-width:0; padding:0; font-weight:bold; }}
 QFrame#sunken {{ background:{WHITE}; {_sunken()} }}
 QProgressBar {{

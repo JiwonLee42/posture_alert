@@ -121,3 +121,32 @@ def test_이벤트에_단계와_사이클_기록():
     eid = r.create_event("posture", "chin_tuck", stage=Stage.CHIN_TUCK, cycle_id=cid)
     row = r.get(eid)
     assert row["stage"] == 2 and row["cycle_id"] == cid
+
+
+def test_설정_저장과_덮어쓰기():
+    r = Repo(":memory:")
+    assert r.get_setting("character") is None
+    r.set_setting("character", "f")
+    r.set_setting("character", "m")
+    assert r.get_setting("character") == "m"
+
+
+def test_시작_이후_기록만():
+    r = Repo(":memory:")
+    r.record("posture", None, "done", ts=datetime(2026, 11, 23, 9))
+    r.record("posture", None, "done", ts=datetime(2026, 11, 24, 9))
+    assert r.events_since("2026-11-24T00:00:00") == [("posture", "done")]
+
+
+def test_초기화하면_기록이_모두_지워지고_번호도_처음부터():
+    r = Repo(":memory:")
+    r.set_setting("character", "f")
+    sid = r.start_session()
+    cid = r.new_cycle(sid)
+    r.mark_stage_done(cid, Stage.CHIN_TUCK)
+    r.create_event("posture", "chin_tuck", stage=Stage.CHIN_TUCK, cycle_id=cid)
+    r.reset()
+    for t in ("events", "cycles", "sessions", "settings"):
+        assert r.conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] == 0
+    assert r.conn.execute("SELECT COUNT(*) FROM stages").fetchone()[0] == 8  # 단계 정의는 유지
+    assert r.start_session() == 1

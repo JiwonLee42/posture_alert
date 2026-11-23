@@ -1,6 +1,7 @@
 """알림 창: Windows 95 '응용 프로그램 오류' 대화상자 스타일.
 
-- GuideCard  : 메인 에러창 (그림 + 단계 + 타이머 + "이 자세가 되었나요?")
+- GuideCard  : 메인 알림 창 (큰 제목 + 남은 수술비 + ✕/○ 그림 + 버튼)
+- Onboarding : 처음 실행 때 여자/남자 고르기 → 시작
 - GhostError : 알림을 무시할수록 뒤에 겹겹이 쌓이는 에러창
 - LightToast : 눈 휴식용 작은 경고창 (8초 뒤 자동으로 닫힘)
 - ReceiptWindow : 오늘의 척추 견적서
@@ -8,16 +9,15 @@
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QPoint, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QPainter, QPixmap
+from PySide6.QtCore import QPoint, QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QProgressBar,
-                               QPushButton, QVBoxLayout, QWidget)
+                               QPushButton, QStackedWidget, QToolButton,
+                               QVBoxLayout, QWidget)
 
-from ..engine.billing import DISCLAIMER, Receipt, price_of, won
+from ..engine.billing import DISCLAIMER, SURGERY_COST, Receipt, price_of, won
 from ..engine.content import APP_NAME, APP_TAGLINE, Exercise, Message
-from ..engine.stages import Stage
-from .retro import (BAD_POSE, CHECK_ICON, CHECK_PAL, CHECKBOX_OFF, CHECKBOX_ON,
-                    CHECKBOX_PAL, DARK, ERROR_ICON, ERROR_PAL, GOOD_POSE, NAVY,
+from .retro import (BAD_POSE, DARK, ERROR_ICON, ERROR_PAL, GOOD_POSE, NAVY,
                     POSE_PAL, WARNING, WARNING_PAL, retro_font, sprite)
 
 IMG_W, IMG_H = 176, 200  # 그림 칸 크기 (기본 그림 400:372, 스트레칭 그림 세로형도 들어가게)
@@ -147,49 +147,6 @@ def _header(msg: Message, icon=ERROR_ICON, pal=ERROR_PAL, code: str = "") -> Hea
     return Header(row, icon_lb, title, body)
 
 
-def _tagline() -> QWidget:
-    """그림 위의 큰 타이틀: 기억하자 / 척추수술 3000만원 (레퍼런스 그림처럼 두 줄 가운데 정렬)."""
-    first, _, second = APP_TAGLINE.partition(" ")
-    box = QWidget()
-    v = QVBoxLayout(box)
-    v.setContentsMargins(0, 4, 0, 2)
-    v.setSpacing(2)
-    for text, px in ((first, 18), (second, 24)):
-        lb = _label(text, px, bold=True)
-        lb.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        v.addWidget(lb)
-    return box
-
-
-def _cycle_strip(cycle_no: int, current: Stage, checks: dict[Stage, bool]) -> QWidget:
-    """사이클 진행 표시: '사이클 #3 · 2/8단계' + 단계 1~8 체크박스 (지금 단계는 남색 번호)."""
-    box = QWidget()
-    row = QHBoxLayout(box)
-    row.setContentsMargins(0, 0, 0, 0)
-    row.setSpacing(6)
-    row.addWidget(_label(f"사이클 #{cycle_no} · {int(current)}/{len(Stage)}단계", 12))
-    row.addStretch()
-    for st in Stage:
-        cell = QVBoxLayout()
-        cell.setSpacing(1)
-        cb = QLabel()
-        cb.setPixmap(_checkbox(checks.get(st, False)))
-        cb.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        cb.setToolTip(st.name)
-        num = _label(str(int(st)), 11, color=NAVY if st == current else DARK)
-        num.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        if st == current:
-            num.setStyleSheet(f"color:{NAVY}; text-decoration: underline;")
-        cell.addWidget(cb)
-        cell.addWidget(num)
-        row.addLayout(cell)
-    return box
-
-
-def _checkbox(on: bool) -> QPixmap:
-    return sprite(CHECKBOX_ON if on else CHECKBOX_OFF, CHECKBOX_PAL, 2)
-
-
 def _button(text: str, primary: bool = False) -> QPushButton:
     b = QPushButton(text)
     b.setFont(retro_font(12))
@@ -241,32 +198,54 @@ def image_panel(pm: QPixmap, caption: str) -> QWidget:
     return box
 
 
-class GuideCard(_RetroWindow):
-    """메인 에러창."""
-    answered = Signal(str)        # done / unsure / snooze / skip
-    want_alternative = Signal()   # 일어나기 알림에서 "지금 못 일어나요"
+def _big_title(px: int = 30) -> QLabel:
+    lb = _label(APP_NAME, px, bold=True)
+    lb.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    return lb
 
-    def __init__(self, msg: Message, ex: Exercise, kind: str, assets: Path,
-                 receipt: Receipt | None = None, can_defer_stand: bool = False,
-                 character: str = "f",
-                 cycle: tuple[int, Stage, dict[Stage, bool]] | None = None):
+
+class AmountBar(QWidget):
+    """남은 수술비: '남은 수술비 1,500만원' + 3,000만원 → 0원 진행 막대."""
+
+    def __init__(self, remaining: int):
+        super().__init__()
+        v = QVBoxLayout(self)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(4)
+        self.label = _label("", 16)
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.bar = QProgressBar()
+        self.bar.setRange(0, SURGERY_COST)
+        row = QHBoxLayout()
+        row.addWidget(_label(won(SURGERY_COST), 11, color=DARK))
+        row.addWidget(self.bar, 1)
+        row.addWidget(_label("0원", 11, color=DARK))
+        v.addWidget(self.label)
+        v.addLayout(row)
+        self.set(remaining)
+
+    def set(self, remaining: int):
+        self.label.setText(f"남은 수술비 <b style='color:#c00000'>{won(remaining)}</b>")
+        self.bar.setValue(SURGERY_COST - remaining)
+
+
+class GuideCard(_RetroWindow):
+    """메인 알림 창: 큰 제목 + 남은 수술비 + ✕/○ 그림 + 동작 한 줄 + 버튼."""
+    answered = Signal(str)        # done / snooze / skip
+    want_alternative = Signal()   # 일어나기 알림에서 "못 일어나요"
+
+    def __init__(self, ex: Exercise, kind: str, assets: Path, remaining: int,
+                 character: str = "f", can_defer_stand: bool = False):
         super().__init__(f"{EXE} - 응용 프로그램 오류")
         self.ex = ex
-        self.setFixedWidth(440)
+        self.price = price_of(kind)
+        self.remaining = remaining
+        self.setFixedWidth(420)
         self.title_bar.closed.connect(lambda: self._answer("skip"))
 
-        price = price_of(kind)
-        code = f"오류 코드 0x{price:05X} · {ERROR_CODES.get(kind, 'SPINE_ERROR')} · 청구 예정 {won(price)}"
-        self.price = price
-        self.header = _header(msg, code=code)
-        self.body.addLayout(self.header.layout)
-
-        self.body.addWidget(_tagline())
-        self.cycle = cycle
-        if cycle is not None:
-            strip = _cycle_strip(*cycle)
-            strip.setObjectName("cycleStrip")
-            self.body.addWidget(strip)
+        self.body.addWidget(_big_title())
+        self.amount = AmountBar(remaining)
+        self.body.addWidget(self.amount)
 
         imgs = QHBoxLayout()
         imgs.addStretch()
@@ -276,114 +255,43 @@ class GuideCard(_RetroWindow):
         imgs.addStretch()
         self.body.addLayout(imgs)
 
-        # 단계마다 Win95 체크박스: 타이머가 지나가면 하나씩 체크, 완료하면 전부 체크
-        self.step_boxes: list[QLabel] = []
-        steps_box = QVBoxLayout()
-        steps_box.setSpacing(4)
-        for i, text in enumerate(ex.steps, 1):
-            row = QHBoxLayout()
-            row.setSpacing(8)
-            box = QLabel()
-            box.setPixmap(_checkbox(False))
-            box.setAlignment(Qt.AlignmentFlag.AlignTop)
-            row.addWidget(box)
-            row.addWidget(_label(f"{i}. {text}"), 1)
-            steps_box.addLayout(row)
-            self.step_boxes.append(box)
-        self.steps = _label("")
-        self.steps.hide()
-        steps_box.addWidget(self.steps)
-        self.body.addLayout(steps_box)
-
-        self.progress = QProgressBar()
-        self.progress.setRange(0, ex.total_seconds)
-        self.progress.setValue(0)
-        self.timer_label = _label("", 12)
-        self.timer_label.setWordWrap(False)
-        prow = QHBoxLayout()
-        prow.addWidget(_label(f"{ex.name} 복구 중...", 12))
-        prow.addWidget(self.progress, 1)
-        prow.addWidget(self.timer_label)
-        self.body.addLayout(prow)
-
-        self.question = _label(f"{ex.check}  이 자세가 되었나요?", 13, bold=True)
+        self.title = _label(ex.name, 16, bold=True)
+        self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.question = _label(f"{ex.check}", 13)
+        self.question.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.body.addWidget(self.title)
         self.body.addWidget(self.question)
 
-        if receipt is not None:
-            self.body.addWidget(_label(
-                f"오늘 방어 {won(receipt.saved_total)} · 청구 {won(receipt.billed_total)}",
-                11, color=DARK))
-
         btns = QHBoxLayout()
-        ok = _button(f"네, 맞췄어요 (+{won(price)})", primary=True)
+        ok = _button(f"했어요 (-{won(self.price)})", primary=True)
         ok.clicked.connect(self._complete)
+        self.buttons = [ok]
         if can_defer_stand:
-            alt = _button("지금 못 일어나요")
+            alt = _button("못 일어나요")
             alt.clicked.connect(self._alternative)
-        else:
-            alt = _button("잘 모르겠어요")
-            alt.clicked.connect(self._show_tip)
-        later = _button("나중에 청구")
+            self.buttons.append(alt)
+        later = _button("나중에")
         later.clicked.connect(lambda: self._answer("snooze"))
-        self.buttons = (ok, alt, later)
+        self.buttons.append(later)
         for b in self.buttons:
             btns.addWidget(b)
         self.body.addLayout(btns)
 
-        self._elapsed = 0
-        self._tick = QTimer(self)
-        self._tick.timeout.connect(self._on_tick)
-        self._tick.start(1000)
-        self._render_time()
-
-    def _on_tick(self):
-        self._elapsed = min(self._elapsed + 1, self.ex.total_seconds)
-        self.progress.setValue(self._elapsed)
-        self._render_time()
-        n = len(self.step_boxes)
-        for i, box in enumerate(self.step_boxes):
-            if self._elapsed >= self.ex.total_seconds * (i + 1) / n:
-                box.setPixmap(_checkbox(True))
-        if self._elapsed >= self.ex.total_seconds:
-            self._tick.stop()
-
-    def _render_time(self):
-        left = self.ex.total_seconds - self._elapsed
-        self.timer_label.setText(f"{left // 60:02d}:{left % 60:02d}")
-
     def _complete(self):
-        """'네, 맞췄어요' → 완료 체크 화면을 1.6초 보여주고 닫힘."""
+        """'했어요' → 금액이 줄어든 모습을 1.6초 보여주고 닫힘."""
         if not self.isVisible():
             return
         self.answered.emit("done")
-        self._tick.stop()
-        self.progress.setValue(self.ex.total_seconds)
-        self.timer_label.setText("완료")
-        for box in self.step_boxes:
-            box.setPixmap(_checkbox(True))
-        if self.cycle is not None:  # 사이클 표시에도 이번 단계 체크
-            no, cur, checks = self.cycle
-            old = self.findChild(QWidget, "cycleStrip")
-            new = _cycle_strip(no, cur, {**checks, cur: True})
-            new.setObjectName("cycleStrip")
-            if old is not None:
-                old.parentWidget().layout().replaceWidget(old, new)
-                old.deleteLater()
-        self.header.icon.setPixmap(sprite(CHECK_ICON, CHECK_PAL, 3))
-        self.header.title.setText("방어 완료!")
-        self.header.body.setText(f"{self.ex.name} 완료로 기록했어요. 병원비 {won(self.price)}을 아꼈어요.")
-        self.question.setText("✔ 오늘 기록에 체크했어요")
-        self.question.setStyleSheet("color:#0b6b0b;")
+        left = max(0, self.remaining - self.price)
+        self.amount.set(left)
+        self.title.setText(f"✔ -{won(self.price)}!")
+        self.title.setStyleSheet("color:#0b6b0b;")
+        self.question.setText("0원이 될 때까지 계속해요" if left else "🎉 수술비 0원 달성!")
         for b in self.buttons:
             b.setEnabled(False)
         self.title_bar.closed.disconnect()
         self.title_bar.closed.connect(self.close)
         QTimer.singleShot(1600, self.close)
-
-    def _show_tip(self):
-        self.steps.show()
-        self.steps.setText("💡 " + (self.ex.tip or "거울이나 휴대폰 카메라로 옆모습을 확인해보세요."))
-        self.answered.emit("unsure")
 
     def _alternative(self):
         self.want_alternative.emit()
@@ -405,7 +313,7 @@ GHOST_LINES = [
 
 
 class GhostError(_RetroWindow):
-    """무시한 알림 수만큼 뒤에 쌓이는 장식용 에러창."""
+    """무시한 알림 수만큼 뒤에 쌓이는 장식용 에러창"""
 
     def __init__(self, i: int):
         super().__init__(f"{EXE}")
@@ -422,18 +330,19 @@ class GhostError(_RetroWindow):
 
 
 class LightToast(_RetroWindow):
-    """눈 휴식처럼 가벼운 알림: 노란 경고창, 8초 뒤 저절로 닫힘."""
+    """눈 휴식처럼 가벼운 알림: 노란 경고창, 8초 뒤 저절로 닫힘"""
     answered = Signal(str)
 
-    def __init__(self, msg: Message, ex: Exercise, auto_close_ms: int = 8000):
-        super().__init__(f"{EXE} - 경고")
-        self.setFixedWidth(340)
+    def __init__(self, ex: Exercise, remaining: int, auto_close_ms: int = 8000):
+        super().__init__(f"{EXE}, 경고")
+        self.setFixedWidth(320)
         self.title_bar.closed.connect(lambda: self._answer("skip"))
-        self.body.addLayout(_error_header(Message(msg.title, f"{msg.body}\n{ex.steps[0]}"),
-                                          icon=WARNING, pal=WARNING_PAL))
+        self.body.addLayout(_error_header(
+            Message(ex.name, f"{ex.steps[0]}\n남은 수술비 {won(remaining)}"),
+            icon=WARNING, pal=WARNING_PAL))
         row = QHBoxLayout()
         row.addStretch()
-        ok = _button("확인", primary=True)
+        ok = _button(f"했어요 (-{won(price_of('eye'))})", primary=True)
         ok.clicked.connect(lambda: self._answer("done"))
         row.addWidget(ok)
         row.addStretch()
@@ -447,7 +356,7 @@ class LightToast(_RetroWindow):
 
 
 class ReceiptWindow(_RetroWindow):
-    """오늘의 척추 견적서."""
+    """오늘의 척추 견적서"""
     WIDTH = 30  # 영수증 한 줄 글자 수 (고정폭)
 
     def __init__(self, receipt: Receipt, now: datetime | None = None, uptime_minutes: int | None = None):
@@ -497,3 +406,71 @@ class ReceiptWindow(_RetroWindow):
         elif r.balance < 0:
             out.append("정형외과 VIP 등급까지 한 걸음 🏥")
         return "\n".join(out)
+
+
+class Onboarding(_RetroWindow):
+    """처음 실행: ① 여자/남자 고르기 → ② '이제 시작할게요. 3,000만원 → 0원' → 시작."""
+    finished = Signal(str)  # 고른 캐릭터 f / m
+
+    def __init__(self, assets: Path):
+        super().__init__(f"{APP_NAME} 설치")
+        self.assets = assets
+        self.setFixedWidth(420)
+        self.title_bar.closed.connect(self.close)
+        self.stack = QStackedWidget()
+        self.stack.addWidget(self._pick_page())
+        self.body.addWidget(self.stack)
+
+    def center(self):
+        self.fit()
+        geo = self.screen().availableGeometry()
+        self.move(geo.center() - self.rect().center())
+
+    def _pick_page(self) -> QWidget:
+        page = QWidget()
+        v = QVBoxLayout(page)
+        v.setSpacing(12)
+        v.addWidget(_big_title())
+        ask = _label("캐릭터를 골라주세요", 15)
+        ask.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        v.addWidget(ask)
+        row = QHBoxLayout()
+        for ch, name in (("f", "여자"), ("m", "남자")):
+            btn = QToolButton()
+            btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+            btn.setIcon(QIcon(pose_image(self.assets, "", "good", ch)))
+            btn.setIconSize(QSize(IMG_W, IMG_H))
+            btn.setText(name)
+            btn.setFont(retro_font(15))
+            btn.clicked.connect(lambda _=False, c=ch: self._picked(c))
+            row.addWidget(btn)
+        v.addLayout(row)
+        return page
+
+    def _start_page(self, ch: str) -> QWidget:
+        page = QWidget()
+        v = QVBoxLayout(page)
+        v.setSpacing(12)
+        v.addWidget(_big_title())
+        img = QLabel()
+        img.setPixmap(pose_image(self.assets, "", "good", ch))
+        img.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        v.addWidget(img)
+        for text, px in (("이제 시작할게요.", 16),
+                         (f"{won(SURGERY_COST)} → 0원을 목표로 할게요!", 18)):
+            lb = _label(text, px, bold=True)
+            lb.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            v.addWidget(lb)
+        row = QHBoxLayout()
+        row.addStretch()
+        go = _button("시작", primary=True)
+        go.clicked.connect(lambda: (self.finished.emit(ch), self.close()))
+        row.addWidget(go)
+        row.addStretch()
+        v.addLayout(row)
+        return page
+
+    def _picked(self, ch: str):
+        self.stack.addWidget(self._start_page(ch))
+        self.stack.setCurrentIndex(1)
+        self.center()

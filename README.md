@@ -1,14 +1,13 @@
 # 척추수술3000 (posture_alert)
 
 > **기억하자 척추수술 3000만원**
->
-> 오늘 당신의 구부정한 목이 청구한 병원비
 
-Windows용 자세 교정 알림 앱. 정해진 간격마다 **Win95 에러창**으로 그림 가이드를 띄워 "이 자세가 되었나요?"라고 묻습니다. 자세를 맞추면 가상 병원비를 **방어**하고, 무시하면 **청구**되며 에러창이 겹겹이 쌓입니다.
+Windows용 자세 교정 알림 앱. 처음 실행할 때 캐릭터(여자/남자)를 고르고 **남은 수술비 3,000만원 → 0원**을 목표로 시작합니다.
+알림이 뜰 때 자세를 맞추고 "했어요"를 누르면 수술비가 줄고, 무시하면 다시 늘어나며 Win95 에러창이 겹겹이 쌓입니다.
 
-| 무시하면 쌓이는 에러창 | 했으면 완료 체크 | 오늘의 견적서 |
-|---|---|---|
-| ![](docs/screenshots/posture_ghosts.png) | ![](docs/screenshots/done.png) | ![](docs/screenshots/receipt.png) |
+| 처음 실행 | 시작 | 알림 | 했어요 |
+|---|---|---|---|
+| ![](docs/screenshots/onboarding_pick.png) | ![](docs/screenshots/onboarding_start.png) | ![](docs/screenshots/card.png) | ![](docs/screenshots/done.png) |
 
 - [PRD.md](PRD.md) — 기획 문서
 - [DEV_GUIDE.md](DEV_GUIDE.md) — 개발 가이드 (Python + PySide6 + PyInstaller)
@@ -26,9 +25,10 @@ uv run posture-alert
 | 명령 | 설명 |
 |---|---|
 | `POSTURE_DEBUG=1 uv run posture-alert` | 1분이 1초로 줄어든 빠른 모드 (20초마다 눈 알림, 30초마다 자세 체크 …) |
-| `uv run posture-alert --demo posture` | 알림 창을 바로 띄우기 (`eye` / `posture` / `stretch` / `stand` / `receipt`), 예시 기록 사용 |
+| `uv run posture-alert --demo posture` | 알림 창을 바로 띄우기 (`eye` / `posture` / `stretch` / `stand` / `receipt` / `onboarding` / 단계 번호 `1`~`8`), 메모리 DB 사용 |
 | `uv run posture-alert --demo posture --ghosts 4` | 무시 4번 쌓인 상태 보기 |
-| `uv run posture-alert --demo posture --complete` | 완료 체크 화면 보기 |
+| `uv run posture-alert --demo posture --complete` | 했어요 누른 화면 보기 |
+| `POSTURE_KEEP_DATA=1 uv run posture-alert` | 종료해도 기록을 지우지 않음 (기본은 종료 시 초기화) |
 | `uv run pytest` | 테스트 |
 
 Mac에서는 자리 비움·전체 화면·회의 감지가 가짜 구현(`platform/fake.py`)으로 동작합니다. 실제 감지는 Windows에서만 됩니다.
@@ -47,6 +47,21 @@ src/posture_alert/
 ├── ui/         # Win95 스타일 창 (retro.py, popup.py)
 └── assets/     # exercises.json, img/(픽셀 그림), fonts/(픽셀 폰트)
 ```
+
+## 남은 수술비
+
+| 알림 | 했어요 | 무시 (닫기·나중에·자동 닫힘) |
+|---|---|---|
+| 눈 휴식 | -50만원 | +50만원 |
+| 자세 체크 · 스트레칭 | -100만원 | +50만원 |
+| 일어나기 | -150만원 | +50만원 |
+
+0원 아래, 3,000만원 위로는 가지 않습니다. 시작한 시각(`settings.started_at`) 이후 `events` 기록으로 계산합니다.
+
+## 종료하면 초기화
+
+트레이 메뉴 "종료"로 끄면 `Repo.reset()`이 `events`, `cycles`, `sessions`, `settings` 행을 모두 지웁니다 (`stages` 단계 정의는 유지, 번호도 1부터).
+다음 실행은 캐릭터 고르기부터 다시 시작합니다. 기록을 남기려면 `POSTURE_KEEP_DATA=1`로 실행하세요.
 
 ## 기록 (SQLite)
 
