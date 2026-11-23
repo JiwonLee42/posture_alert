@@ -3,7 +3,7 @@
 - GuideCard  : 메인 에러창 (그림 + 단계 + 타이머 + "이 자세가 되었나요?")
 - GhostError : 알림을 무시할수록 뒤에 겹겹이 쌓이는 에러창
 - LightToast : 눈 휴식용 작은 경고창 (8초 뒤 자동으로 닫힘)
-- ReceiptWindow : 오늘의 거북목 견적서
+- ReceiptWindow : 오늘의 척추 견적서
 """
 from datetime import datetime
 from pathlib import Path
@@ -19,7 +19,7 @@ from .retro import (BAD_POSE, DARK, ERROR_ICON, ERROR_PAL, GOOD_POSE, NAVY,
                     POSE_PAL, WARNING, WARNING_PAL, retro_font, sprite)
 
 IMG_SIZE = 128
-EXE = "거북목.exe"
+EXE = f"{APP_NAME}.exe"
 ERROR_CODES = {
     "posture": "TURTLE_NECK_OVERFLOW",
     "stretch": "SHOULDER_LOCK_EXCEPTION",
@@ -302,11 +302,11 @@ class LightToast(_RetroWindow):
 
 
 class ReceiptWindow(_RetroWindow):
-    """오늘의 거북목 견적서."""
+    """오늘의 척추 견적서."""
     WIDTH = 30  # 영수증 한 줄 글자 수 (고정폭)
 
     def __init__(self, receipt: Receipt, now: datetime | None = None):
-        super().__init__(f"{APP_NAME}.txt - 메모장")
+        super().__init__(f"{APP_NAME} 견적서.txt - 메모장")
         self.setFixedWidth(360)
         self.title_bar.closed.connect(self.close)
         paper = QFrame()
@@ -333,7 +333,7 @@ class ReceiptWindow(_RetroWindow):
     def _render(cls, r: Receipt, now: datetime) -> str:
         w = cls.WIDTH
         days = "월화수목금토일"
-        out = [APP_NAME.center(w - 4), f"{now:%Y-%m-%d} ({days[now.weekday()]}) {now:%H:%M}".center(w),
+        out = [f"{APP_NAME} 견적서".center(w - 6), f"{now:%Y-%m-%d} ({days[now.weekday()]}) {now:%H:%M}".center(w),
                "-" * w, "[방어 내역]"]
         out += [f"{l.name} x{l.count}  {won(l.amount)}" for l in r.saved] or ["  (없음)"]
         out += ["", "[청구 내역]"]
