@@ -31,7 +31,13 @@ def close(app):
 
 def started_app(qapp, tmp_path):
     app = App(qapp, 1.0, repo=Repo(tmp_path / "pet.sqlite3"))
-    app._on_started("f")     # 여자 고르고 시작 (첫 알림 타이머는 이벤트 루프가 없어 안 돎)
+    # 시작하면 0.3초 뒤 첫 알림이 뜨는데, 테스트마다 알림 수가 달라지지 않게(윈도우 CI는 느려서 중간에
+    # 타이머가 돌 수 있음) 그 타이머가 걸리는 동안만 show_next 를 빈 함수로 바꿔 둔다
+    real = app.show_next
+    app.show_next = lambda: None
+    app._on_started("f")     # 여자 고르고 시작
+    del app.show_next        # 원래 메서드로 복구 (타이머에는 빈 함수가 이미 걸려 있음)
+    assert app.show_next == real
     return app
 
 
