@@ -13,7 +13,7 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from PySide6.QtCore import QPoint, QStandardPaths, QTimer
+from PySide6.QtCore import QLockFile, QPoint, QStandardPaths, QTimer
 from PySide6.QtGui import QColor, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
@@ -302,12 +302,23 @@ def main() -> None:
     qapp = QApplication(sys.argv)
     qapp.setApplicationName("posture-alert")  # DB 폴더 이름 고정
     qapp.setQuitOnLastWindowClosed(False)
+
+    # 중복 실행 방지: 이미 켜져 있으면 조용히 종료 (데모/스크린샷은 여러 개 떠도 됨)
+    args = sys.argv[1:]
+    lock = None
+    if "--demo" not in args and "--shot" not in args:
+        lock = QLockFile(str(Path(QStandardPaths.writableLocation(
+            QStandardPaths.StandardLocation.TempLocation)) / "posture-alert.lock"))
+        lock.setStaleLockTime(0)  # 비정상 종료로 남은 잠금은 무시
+        if not lock.tryLock(100):
+            print("척추수술3000은 이미 실행 중이에요. 트레이(메뉴바) 아이콘을 확인해 주세요.")
+            sys.exit(0)
+
     load_fonts(assets_dir())
     qapp.setFont(retro_font(12))  # 따로 지정 안 한 글자도 설치된 폰트로 (기본 "Sans Serif" 찾느라 느려지는 것 방지)
     qapp.setStyleSheet(STYLESHEET)
 
     speed = 60.0 if os.environ.get("POSTURE_DEBUG") == "1" else 1.0
-    args = sys.argv[1:]
     # 데모: 실제 기록을 건드리지 않게 처음부터 메모리 DB 사용
     app = App(qapp, speed, repo=Repo(":memory:") if "--demo" in args else None)
 
@@ -340,7 +351,10 @@ def main() -> None:
         out = args[args.index("--shot") + 1]
         QTimer.singleShot(400, lambda: (save_shot(app, out), qapp.quit()))
 
-    sys.exit(qapp.exec())
+    code = qapp.exec()
+    if lock is not None:
+        lock.unlock()
+    sys.exit(code)
 
 
 if __name__ == "__main__":
