@@ -183,6 +183,21 @@ def test_종료_확인_중에는_알림이_뜨지_않는다(qapp, tmp_path):
     close(app)
 
 
+def test_종료를_누르면_열린_알림도_같이_닫히고_수술비는_그대로(qapp, tmp_path):
+    app = started_app(qapp, tmp_path)
+    app.show_next()
+    assert app.card is not None
+    before = app.remaining()
+    app.ask_quit()
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    QApplication.processEvents()
+    assert app.card is None
+    assert app.remaining() == before
+    result = app.repo.conn.execute("SELECT result FROM events ORDER BY id DESC LIMIT 1").fetchone()[0]
+    assert result == "shown"
+    close(app)
+
+
 def test_트레이로_캐릭터를_숨기고_다시_보인다(qapp, tmp_path):
     app = started_app(qapp, tmp_path)
     app.toggle_mini()

@@ -182,6 +182,10 @@ class App:
         """숫자 창 X: "종료하시겠어요?" → 예: 영수증을 보여 주고, 영수증을 닫으면 앱 종료."""
         if self.confirm is not None:
             return
+        # 열려 있던 알림은 닫는다. 답을 누른 게 아니라서 수술비는 안 바뀌고, 기록은 'shown' 으로 남는다
+        if self.card is not None:
+            self.card.close()
+        self._close_ghosts()
         self.confirm = self._retain(ConfirmQuit())
         self.confirm.accepted.connect(self._quit_with_receipt)
         self.confirm.destroyed.connect(lambda *_: setattr(self, "confirm", None))
