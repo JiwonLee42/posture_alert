@@ -433,6 +433,46 @@ class MiniWidget(_RetroWindow):
                       min(max(y, geo.top()), geo.bottom() - self.height()))
 
 
+class ConfirmQuit(_RetroWindow):
+    """숫자 창 X 를 눌렀을 때: "오늘의 척추수술3000을 종료하시겠어요?" 예 / 아니요."""
+    accepted = Signal()
+    rejected = Signal()
+
+    def __init__(self):
+        super().__init__(f"{APP_NAME} - 종료")
+        self.setFixedWidth(340)
+        self.title_bar.closed.connect(self._no)
+        row = QHBoxLayout()
+        icon = QLabel()
+        icon.setPixmap(sprite(WARNING, WARNING_PAL, 3))
+        row.addWidget(icon)
+        row.addSpacing(8)
+        row.addWidget(_label(f"오늘의 {APP_NAME}을\n종료하시겠어요?", 16, bold=True), 1)
+        self.body.addLayout(row)
+        self.body.addWidget(_label("종료하면 오늘의 수술 영수증이 먼저 떠요.", 12))
+        btns = QHBoxLayout()
+        btns.addStretch()
+        yes = _button("예", primary=True)
+        yes.setMinimumWidth(90)
+        yes.clicked.connect(self._yes)
+        no = _button("아니요")
+        no.setMinimumWidth(90)
+        no.clicked.connect(self._no)
+        btns.addWidget(yes)
+        btns.addSpacing(12)
+        btns.addWidget(no)
+        btns.addStretch()
+        self.body.addLayout(btns)
+
+    def _yes(self):
+        self.accepted.emit()
+        self.close()
+
+    def _no(self):
+        self.rejected.emit()
+        self.close()
+
+
 class PetWidget(QWidget):
     """화면 구석에 떠 있는 캐릭터. 평소엔 바른 자세, 알림이 떠 있으면 거북목 자세.
     클릭하면 clicked 신호(숫자 창 열기), 끌면 옮겨진다. 배경은 투명."""

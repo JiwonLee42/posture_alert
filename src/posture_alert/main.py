@@ -25,7 +25,7 @@ from .engine.uptime import UptimeCounter
 from .engine.scheduler import Kind, Scheduler
 from .platform import get_monitor
 from .storage.repo import Repo
-from .ui.popup import CHARACTERS, GhostError, GuideCard, LightToast, Onboarding, MiniWidget, PetWidget, ReceiptWindow
+from .ui.popup import CHARACTERS, GhostError, GuideCard, LightToast, ConfirmQuit, Onboarding, MiniWidget, PetWidget, ReceiptWindow
 from .ui.retro import ERROR_ICON, ERROR_PAL, STYLESHEET, load_fonts, retro_font, sprite
 
 
@@ -68,6 +68,8 @@ class App:
         self.receipt_win = None
         self.mini = None   # 캐릭터를 눌렀을 때 펼쳐지는 숫자 창
         self.pet = None    # 오른쪽 아래 캐릭터
+        self.confirm = None
+        self.receipt_win_quits = False
         self.ignored_streak = 0   # 연속으로 무시한 횟수 → 에러창이 그만큼 쌓인다
         self._seq = 0
         # 캐릭터: POSTURE_CHARACTER=f|m 이 있으면 그걸, 아니면 처음 실행 때 고른 값
@@ -158,7 +160,7 @@ class App:
             return
         if self.mini is None:
             self.mini = self._retain(MiniWidget())
-            self.mini.hidden_by_user.connect(self.show_receipt)  # X 로 닫으면 오늘의 영수증
+            self.mini.hidden_by_user.connect(self.ask_quit)  # X → 종료할까요?
             self.mini.destroyed.connect(lambda *_: setattr(self, "mini", None))
         self.update_mini()
         self.mini.fit()
@@ -175,6 +177,21 @@ class App:
         if y < geo.top():
             y = self.pet.y() + self.pet.height() + 6
         self.mini.move(self.mini.clamp_pos(x, y))
+
+    def ask_quit(self):
+        """숫자 창 X: "종료하시겠어요?" → 예: 영수증을 보여 주고, 영수증을 닫으면 앱 종료."""
+        if self.confirm is not None:
+            return
+        self.confirm = self._retain(ConfirmQuit())
+        self.confirm.accepted.connect(self._quit_with_receipt)
+        self.confirm.destroyed.connect(lambda *_: setattr(self, "confirm", None))
+        self.confirm.show_at(self.confirm.home_pos())
+
+    def _quit_with_receipt(self):
+        self.show_receipt()
+        w = self.receipt_win
+        w.destroyed.connect(lambda *_: self.qapp.quit() if self.receipt_win_quits else None)
+        self.receipt_win_quits = True
 
     def update_mini(self):
         if not self.started:
@@ -203,7 +220,7 @@ class App:
         self._close_ghosts()
         if self.onboarding is not None:
             self.onboarding.close()
-        for w in (self.mini, self.pet):
+        for w in (self.confirm, self.mini, self.pet):
             if w is not None:
                 w.close()
         self.tray.hide()
@@ -353,6 +370,7 @@ class App:
             QTimer.singleShot(int(5 * 60 * 1000 / self.speed), lambda: self.show_stage(stage))
 
     def show_receipt(self):
+        self.receipt_win_quits = False   # 이전 영수증을 닫을 때 앱이 꺼지지 않게
         if self.receipt_win is not None:
             try:
                 self.receipt_win.close()
@@ -367,7 +385,7 @@ def save_shot(app: "App", out: str) -> None:
     """떠 있는 창들(겹친 에러창 포함)을 한 장의 이미지로 저장 (데모·문서용)."""
     from PySide6.QtCore import QRect
     from PySide6.QtGui import QPainter, QPixmap
-    wins = [w for w in [*app.ghosts, app.card, app.receipt_win, app.onboarding, app.pet, app.mini]
+    wins = [w for w in [*app.ghosts, app.card, app.receipt_win, app.onboarding, app.pet, app.mini, app.confirm]
             if w is not None and w.isVisible()]
     rect = QRect()
     for w in wins:
