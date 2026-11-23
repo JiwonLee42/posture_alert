@@ -244,8 +244,17 @@ class App:
         # 30분 이상 앉아 있다가 자리를 비웠으면 "일어남"으로 방어 처리
         if self.scheduler.sitting_since is None and was_sitting >= timedelta(minutes=30) / self.speed:
             self.repo.record(Kind.STAND.value, None, "away")
-        if kind is None or self.card is not None or not self.started:  # 시작 전·이미 떠 있으면 안 띄움
+        if kind is None or not self.started:  # 시작 전이면 안 띄움
             return
+        self.fire(kind)
+
+    def fire(self, kind: Kind):
+        """알림 시각이 됐을 때. 앞 알림에 아직 답을 안 했으면 '무시'로 치고 다음 단계로 넘어간다.
+        (알림 창은 누를 때까지 떠 있으므로, 이렇게 안 하면 새 알림이 삼켜져 같은 단계에서 멈춘다)"""
+        if self.quitting:
+            return
+        if self.card is not None:
+            self.card._answer("timeout")   # 수술비 +50만원, 에러창이 쌓임
         if kind is Kind.STAND:
             self.show_stage(Stage.STAND_WATER, interrupt=True)  # 오래 앉았으면 끼어들기
         else:
