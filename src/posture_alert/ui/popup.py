@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QProgressBar,
 
 from ..engine.billing import DISCLAIMER, SURGERY_COST, Receipt, price_of, won
 from ..engine.content import APP_NAME, APP_TAGLINE, Exercise, Message
-from .retro import (BAD_POSE, DARK, ERROR_ICON, ERROR_PAL, GOOD_POSE, NAVY,
+from .retro import (BAD_POSE, DARK, MONO_FAMILIES, ERROR_ICON, ERROR_PAL, GOOD_POSE, NAVY,
                     POSE_PAL, WARNING, WARNING_PAL, retro_font, sprite)
 
 # ---- 화면 조절용 설정값 (여기 숫자만 바꾸면 됨) ----
@@ -388,8 +388,7 @@ class ReceiptWindow(_RetroWindow):
         v = QVBoxLayout(paper)
         v.setContentsMargins(12, 10, 12, 10)
         text = QLabel(self._render(receipt, now or datetime.now(), uptime_minutes))
-        mono = retro_font(13)
-        mono.setFamilies(["Galmuri11", "D2Coding", "Menlo", "Consolas"])
+        mono = retro_font(13, families=MONO_FAMILIES)
         text.setFont(mono)
         text.setStyleSheet("color:black;")
         v.addWidget(text)
@@ -420,9 +419,9 @@ class ReceiptWindow(_RetroWindow):
                 "=" * w]
         sign = "+" if r.balance >= 0 else "-"
         out.append(f"오늘의 척추 수익 {sign}{won(abs(r.balance))}")
-        chickens = r.balance // 20_000
-        if chickens > 0:
-            out.append(f"치킨 {chickens}마리 벌었습니다 🍗")
+        sessions = r.balance // 100_000  # 도수치료 1회 10만원으로 환산
+        if sessions > 0:
+            out.append(f"도수치료 {sessions}회분 아꼈어요 💪")
         elif r.balance < 0:
             out.append("정형외과 VIP 등급까지 한 걸음 🏥")
         return "\n".join(out)

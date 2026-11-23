@@ -11,18 +11,26 @@ BLACK = "#000000"
 NAVY = "#000080"
 BLUE = "#1084d0"
 
-# assets/fonts 에 Galmuri11.ttf 등 픽셀 폰트를 넣으면 자동으로 쓴다
-FONT_FAMILIES = ["Galmuri11", "DungGeunMo", "Malgun Gothic", "Apple SD Gothic Neo"]
+# 앞에서부터 있는 폰트를 쓴다. 픽셀 폰트(둥근모꼴)는 assets/fonts 에 들어 있음
+PIXEL_FONTS = ["DungGeunMo"]
+FONT_FAMILIES = PIXEL_FONTS + ["Malgun Gothic", "Apple SD Gothic Neo"]  # 없으면 Windows/Mac 기본 한글 폰트
+MONO_FAMILIES = PIXEL_FONTS + ["D2Coding", "Consolas", "Menlo"]
 
 
 def load_fonts(assets: Path) -> None:
     for f in (assets / "fonts").glob("*.[ot]tf"):
-        QFontDatabase.addApplicationFont(str(f))
+        QFontDatabase.addApplicationFont(str(f.resolve()))
 
 
-def retro_font(px: int = 12, bold: bool = False) -> QFont:
+def installed(families: list[str]) -> list[str]:
+    """설치된 폰트만 남긴다. 없는 이름을 넘기면 Qt 가 대체 폰트를 찾느라 느려지고 경고를 찍음."""
+    have = set(QFontDatabase.families())
+    return [f for f in families if f in have] or families[-1:]
+
+
+def retro_font(px: int = 12, bold: bool = False, families: list[str] | None = None) -> QFont:
     f = QFont()
-    f.setFamilies(FONT_FAMILIES)
+    f.setFamilies(installed(families or FONT_FAMILIES))
     f.setPixelSize(px)
     if _has_pixel_font():
         # 픽셀 폰트: 계단 현상 그대로, 굵게는 끔 (굵은 글꼴이 없어서 가짜 굵게가 번짐)
@@ -34,8 +42,7 @@ def retro_font(px: int = 12, bold: bool = False) -> QFont:
 
 
 def _has_pixel_font() -> bool:
-    families = set(QFontDatabase.families())
-    return any(name in families for name in FONT_FAMILIES[:2])
+    return bool(set(PIXEL_FONTS) & set(QFontDatabase.families()))
 
 
 def _raised(w=2):

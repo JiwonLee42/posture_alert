@@ -25,7 +25,7 @@ from .engine.scheduler import Kind, Scheduler
 from .platform import get_monitor
 from .storage.repo import Repo
 from .ui.popup import CHARACTERS, GhostError, GuideCard, LightToast, Onboarding, ReceiptWindow
-from .ui.retro import ERROR_ICON, ERROR_PAL, STYLESHEET, load_fonts, sprite
+from .ui.retro import ERROR_ICON, ERROR_PAL, STYLESHEET, load_fonts, retro_font, sprite
 
 
 def assets_dir() -> Path:
@@ -302,6 +302,7 @@ def main() -> None:
     qapp.setApplicationName("posture-alert")  # DB 폴더 이름 고정
     qapp.setQuitOnLastWindowClosed(False)
     load_fonts(assets_dir())
+    qapp.setFont(retro_font(12))  # 따로 지정 안 한 글자도 설치된 폰트로 (기본 "Sans Serif" 찾느라 느려지는 것 방지)
     qapp.setStyleSheet(STYLESHEET)
 
     speed = 60.0 if os.environ.get("POSTURE_DEBUG") == "1" else 1.0
