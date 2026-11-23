@@ -247,13 +247,11 @@ def main() -> None:
     qapp.setStyleSheet(STYLESHEET)
 
     speed = 60.0 if os.environ.get("POSTURE_DEBUG") == "1" else 1.0
-    app = App(qapp, speed)
-
     args = sys.argv[1:]
+    # 데모: 실제 기록을 건드리지 않게 처음부터 메모리 DB 사용
+    app = App(qapp, speed, repo=Repo(":memory:") if "--demo" in args else None)
+
     if "--demo" in args:
-        # 데모: 실제 기록을 건드리지 않게 메모리 DB + 예시 기록
-        app.repo = Repo(":memory:")
-        app.session_id = app.repo.start_session()
         app.uptime.started -= 137 * 60  # 2시간 17분 켜둔 것처럼
         for k, r in [("posture", "done")] * 4 + [("stretch", "done")] * 2 + \
                     [("stand", "away"), ("eye", "done"), ("stand", "skip"), ("posture", "snooze")]:
