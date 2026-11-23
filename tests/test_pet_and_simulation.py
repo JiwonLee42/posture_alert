@@ -102,8 +102,7 @@ def test_알림이_뜨면_거북목_자세_답하면_바른_자세(qapp, tmp_pat
     app.show_next()
     assert app.pet.bad is True and app.pet.bubble.text() == "자세 확인!"
     app.card._answer("done")
-    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
-    QApplication.processEvents()
+    QTest.qWait(50)          # 답한 뒤 갱신 타이머가 돌 시간 (윈도우 CI에서 타이밍이 달라서 넉넉히)
     assert app.pet.bad is False
     close(app)
 
