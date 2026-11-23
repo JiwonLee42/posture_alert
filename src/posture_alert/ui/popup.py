@@ -20,7 +20,7 @@ from .retro import (BAD_POSE, CHECK_ICON, CHECK_PAL, CHECKBOX_OFF, CHECKBOX_ON,
                     CHECKBOX_PAL, DARK, ERROR_ICON, ERROR_PAL, GOOD_POSE, NAVY,
                     POSE_PAL, WARNING, WARNING_PAL, retro_font, sprite)
 
-IMG_W, IMG_H = 176, 164  # 그림 칸 크기 (기본 캐릭터 그림 비율 400:372)
+IMG_W, IMG_H = 176, 200  # 그림 칸 크기 (기본 그림 400:372, 스트레칭 그림 세로형도 들어가게)
 EXE = f"{APP_NAME}.exe"
 ERROR_CODES = {
     "posture": "TURTLE_NECK_OVERFLOW",
@@ -87,14 +87,23 @@ class _RetroWindow(QWidget):
         self.body.setSpacing(10)
         self.root.addLayout(self.body)
 
-    def bottom_right(self, offset: int = 0) -> QPoint:
+    def fit(self):
+        """줄바꿈되는 글자까지 포함한 실제 필요 높이로 창 크기를 맞춘다.
+        (adjustSize 만 쓰면 줄바꿈 높이를 덜 잡아서 아래 내용이 겹침)"""
         self.adjustSize()
+        lay = self.layout()
+        need = lay.totalHeightForWidth(self.width()) if lay.hasHeightForWidth() else -1
+        need = max(need, lay.totalMinimumSize().height(), self.height())
+        self.resize(self.width(), need)
+
+    def bottom_right(self, offset: int = 0) -> QPoint:
+        self.fit()
         geo = self.screen().availableGeometry()
         return QPoint(geo.right() - self.width() - 16 - offset,
                       geo.bottom() - self.height() - 16 - offset)
 
     def show_at(self, pos: QPoint):
-        self.adjustSize()
+        self.fit()
         self.move(pos)
         self.show()
 

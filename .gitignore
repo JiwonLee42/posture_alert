@@ -23,3 +23,7 @@ installer/Output/
 Thumbs.db
 .vscode/
 .idea/
+
+# 받은 원본 그림 (잘라서 assets/img 에 넣은 뒤엔 필요 없음)
+inbox/*
+!inbox/.gitkeep
