@@ -112,3 +112,12 @@ def test_사이클_모드도_90분_착석이면_일어나기():
     s.tick(snap(0))
     kinds = {m: s.tick(snap(m)) for m in range(1, 91)}
     assert kinds[90] is Kind.STAND
+
+
+def test_초단위_테스트_간격():
+    s = Scheduler.for_cycle(3 / 60)  # 3초
+    s.typing_grace_seconds = 0
+    t = datetime(2026, 1, 1)
+    s.tick(Snapshot(t, 0))
+    fired = [sec for sec in range(1, 10) if s.tick(Snapshot(t + timedelta(seconds=sec), 0))]
+    assert fired == [3, 6, 9]

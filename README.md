@@ -24,6 +24,7 @@ uv run posture-alert
 
 | 명령 | 설명 |
 |---|---|
+| `POSTURE_EVERY_SECONDS=3 uv run posture-alert` | 테스트: 3초마다 다음 단계 알림 (마우스를 움직여도 바로 뜸) |
 | `POSTURE_DEBUG=1 uv run posture-alert` | 1분이 1초로 줄어든 빠른 모드 (20초마다 눈 알림, 30초마다 자세 체크 …) |
 | `uv run posture-alert --demo posture` | 알림 창을 바로 띄우기 (`eye` / `posture` / `stretch` / `stand` / `receipt` / `onboarding` / 단계 번호 `1`~`8`), 메모리 DB 사용 |
 | `uv run posture-alert --demo posture --ghosts 4` | 무시 4번 쌓인 상태 보기 |

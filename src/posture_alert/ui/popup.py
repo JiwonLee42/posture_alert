@@ -102,6 +102,14 @@ class _RetroWindow(QWidget):
         need = max(need, lay.totalMinimumSize().height(), self.height())
         self.resize(self.width(), need)
 
+    def later(self, ms: int, fn) -> None:
+        """ms 뒤에 fn 실행. 타이머가 이 창에 붙어 있어서, 그 전에 창이 닫혀 지워지면 같이 취소된다.
+        (QTimer.singleShot(ms, lambda: ...) 는 창이 지워진 뒤에도 실행돼 에러가 남)"""
+        t = QTimer(self)
+        t.setSingleShot(True)
+        t.timeout.connect(fn)
+        t.start(ms)
+
     def bottom_right(self, offset: int = 0) -> QPoint:
         self.fit()
         geo = self.screen().availableGeometry()
@@ -303,7 +311,7 @@ class GuideCard(_RetroWindow):
             b.setEnabled(False)
         self.title_bar.closed.disconnect()
         self.title_bar.closed.connect(self.close)
-        QTimer.singleShot(1600, self.close)
+        self.later(1600, self.close)
 
     def _alternative(self):
         self.want_alternative.emit()
@@ -359,7 +367,7 @@ class LightToast(_RetroWindow):
         row.addWidget(ok)
         row.addStretch()
         self.body.addLayout(row)
-        QTimer.singleShot(auto_close_ms, lambda: self._answer("timeout"))
+        self.later(auto_close_ms, lambda: self._answer("timeout"))
 
     def _answer(self, result: str):
         if self.isVisible():
