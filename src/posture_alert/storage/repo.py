@@ -32,6 +32,10 @@ CREATE TABLE IF NOT EXISTS stages (
     title       TEXT NOT NULL,         -- 멘트 제목
     body        TEXT NOT NULL          -- 멘트 본문
 );
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,   -- character, onboarded_at ...
+    value TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS sessions (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     started_at     TEXT NOT NULL,              -- 앱을 켠 시각
@@ -105,6 +109,36 @@ class Repo:
              for st, i in STAGES.items()],
         )
         self.conn.commit()
+
+    # --- 초기화 ---
+    RESET_TABLES = ("events", "cycles", "sessions", "settings")
+
+    def reset(self) -> None:
+        """기록 행을 모두 지워 처음 상태로 (테이블 구조와 stages 단계 정의는 유지).
+        AUTOINCREMENT 번호도 1부터 다시 시작하게 sqlite_sequence 도 비운다."""
+        with self.conn:  # 한 트랜잭션: 중간에 실패하면 아무것도 안 지워짐
+            for t in self.RESET_TABLES:
+                self.conn.execute(f"DELETE FROM {t}")
+            self.conn.execute(
+                f"DELETE FROM sqlite_sequence WHERE name IN ({','.join('?' * len(self.RESET_TABLES))})",
+                self.RESET_TABLES)
+        self._seed_stages()
+
+    # --- 설정 (처음 실행 때 고른 캐릭터 등) ---
+    def get_setting(self, key: str, default: str | None = None) -> str | None:
+        row = self.conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else default
+
+    def set_setting(self, key: str, value: str) -> None:
+        self.conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
+        self.conn.commit()
+
+    def events_since(self, ts: str | None) -> list[tuple[str, str]]:
+        """ts(시작한 시각) 이후의 (kind, result) 전부 → 남은 수술비 계산용."""
+        return [tuple(r) for r in self.conn.execute(
+            "SELECT kind, result FROM events WHERE ts >= ? ORDER BY id", (ts or "",))]
 
     # --- 세션: 앱을 켜둔 시간 ---
     def start_session(self, ts: datetime | None = None) -> int:

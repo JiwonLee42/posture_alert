@@ -4,6 +4,7 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest  # noqa: E402
+from PySide6.QtCore import QEvent  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from posture_alert.engine.stages import Stage  # noqa: E402
@@ -20,7 +21,9 @@ def close(app):
     if app.card is not None:
         app.card._answer("skip")
     app.shutdown()
-    QApplication.processEvents()  # deleteLater 처리 (창 정리)
+    # 닫힌 창의 deleteLater 를 실제로 처리 (이벤트 루프가 없는 테스트라 직접)
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    QApplication.processEvents()
 
 
 def test_알림마다_다음_단계로_사이클(qapp, tmp_path):
@@ -75,3 +78,38 @@ def test_켜둔_시간을_세션에_저장(qapp, tmp_path):
         "SELECT uptime_minutes FROM sessions WHERE id = ?", (app.session_id,)).fetchone()
     assert row[0] == 5
     close(app)
+
+
+def test_처음엔_캐릭터_고르기_후_시작(qapp, tmp_path):
+    app = App(qapp, 1.0, repo=Repo(tmp_path / "e.sqlite3"))
+    QApplication.processEvents()          # 처음 실행 → 캐릭터 고르기 창
+    assert not app.started and app.onboarding is not None
+    app.onboarding._picked("m")
+    app.onboarding.finished.emit("m")
+    assert app.started and app.character == "m"
+    assert app.remaining() == 30_000_000
+    close(app)
+
+
+def test_했어요_하면_남은_수술비가_줄어듦(qapp, tmp_path):
+    app = App(qapp, 1.0, repo=Repo(tmp_path / "f.sqlite3"))
+    app._on_started("f")
+    app.show_next()                       # 1단계 눈 (-50만원)
+    app.card._answer("done")
+    app.show_next()                       # 2단계 턱 당기기 (-100만원)
+    app.card._complete()
+    assert app.remaining() == 30_000_000 - 500_000 - 1_000_000
+    close(app)
+
+
+def test_종료하면_DB_초기화(qapp, tmp_path):
+    db = tmp_path / "g.sqlite3"
+    app = App(qapp, 1.0, repo=Repo(db))
+    app._on_started("f")
+    app.show_next()                       # 1단계 눈 (작은 창)
+    app.card._answer("done")
+    app.on_quit()                         # aboutToQuit 에 연결된 처리
+    close(app)
+    r = Repo(db)
+    for t in ("events", "cycles", "sessions", "settings"):
+        assert r.conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] == 0
