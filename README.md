@@ -1,19 +1,35 @@
+<div align="center">
+
 # 척추수술3000
 
-> **기억하자 척추수술 3000만원**
+**기억하자, 척추수술 3000만원**
 
-일하는 동안 자세를 알려 주는 Windows 앱이에요. **남은 수술비 3,000만원 → 0원**을 목표로,
-알림이 뜰 때마다 동작을 따라 하고 "했어요"를 누르면 수술비가 줄고, 무시하면 다시 늘어나요. 알림은 Win95 에러창 모양이에요.
+일하는 동안 자세를 알려 주는 Windows 앱 · 남은 수술비 **3,000만원 → 0원**을 목표로!
 
-| 처음 실행 | 시작 | 알림 | 했어요 |
+### [⬇️ 최신 버전 다운로드 (Windows)](https://github.com/JiwonLee42/posture_alert/releases/latest/download/posture-alert-windows.zip)
+
+[새로운 점](https://github.com/JiwonLee42/posture_alert/releases/latest) · [전체 버전](https://github.com/JiwonLee42/posture_alert/releases) · [사용법](#사용법) · [자주 묻는 질문](#자주-묻는-질문)
+
+| 처음 실행 | 알림 | 했어요 | 오늘의 영수증 |
 |---|---|---|---|
-| ![](docs/screenshots/onboarding_pick.png) | ![](docs/screenshots/onboarding_start.png) | ![](docs/screenshots/card.png) | ![](docs/screenshots/done.png) |
+| ![](docs/screenshots/onboarding_pick.png) | ![](docs/screenshots/card.png) | ![](docs/screenshots/done.png) | ![](docs/screenshots/receipt.png) |
 
-## 설치
+</div>
 
-1. [Releases](../../releases)에서 가장 위(최신) 버전의 **posture-alert-windows.zip**을 받아요.
-2. 압축을 풀고 **`posture-alert.exe`**를 실행해요. 설치는 필요 없어요.
-3. 윈도우가 "PC를 보호했습니다" 경고를 띄우면 **추가 정보 → 실행**을 눌러요. (서명이 없는 앱이라 처음에만 떠요.)
+## 이런 앱이에요
+
+- ⏰ **30분마다** 한 가지 동작을 알려 줘요. (눈 → 턱 → 어깨 → 목 → 날개뼈 → 허리 → 발목 → 일어나기, 총 8단계)
+- 💸 따라 하고 **"했어요"**를 누르면 수술비가 줄고, 무시하면 다시 늘어나요.
+- 🖥️ Win95 에러창 모양이라 눈에 확 띄고, 화면 구석의 캐릭터가 **알림이 오면 거북목**이 돼요.
+- 🔒 내 PC 안에서만 동작해요. 서버로 보내는 데이터가 없어요.
+
+## 다운로드
+
+1. 위의 **⬇️ 최신 버전 다운로드**를 눌러 zip을 받아요. (Releases 페이지의 **Assets → `posture-alert-windows.zip`**과 같은 파일이에요.)
+2. 압축을 풀고 **`posture-alert.exe`**를 더블클릭해요. 설치는 필요 없어요.
+3. 윈도우가 "PC를 보호했습니다"를 띄우면 **추가 정보 → 실행**을 눌러요. (서명이 없는 앱이라 처음에만 떠요.)
+
+> 💡 저장소가 비공개라서 GitHub에 로그인한 상태에서만 받을 수 있어요. 받을 권한이 없으면 저장소 주인에게 초대를 요청하세요.
 
 ## 사용법
 
@@ -73,6 +89,6 @@
 
 ## 문서
 
-- [개발 문서](docs/DEVELOPMENT.md) — 소스 실행, 빌드·배포, 구조, DB, 단계 사이클 (내부용)
+- [개발 문서](docs/DEVELOPMENT.md) — 소스 실행, 빌드·배포, 구조, DB (내부용)
 - [버전별 릴리즈 기록](docs/RELEASES.md)
-- [PRD.md](PRD.md) — 기획 문서 · [DEV_GUIDE.md](DEV_GUIDE.md) — 개발 가이드 · [docs/IMAGE_PROMPTS.md](docs/IMAGE_PROMPTS.md) — 이미지 프롬프트
+- [PRD](PRD.md) · [개발 가이드](DEV_GUIDE.md) · [이미지 프롬프트](docs/IMAGE_PROMPTS.md)
