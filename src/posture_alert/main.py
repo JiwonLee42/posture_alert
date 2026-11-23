@@ -200,7 +200,7 @@ class App:
     def update_mini(self):
         if not self.started:
             return
-        alert = self.card is not None
+        alert = self.card is not None and self.card.isVisible()   # 닫힌 직후(삭제 전)에는 알림 아님
         if self.pet is not None:
             self.pet.set_state(alert, won(self.remaining()))
         if self.mini is not None:
@@ -335,7 +335,6 @@ class App:
         seq = self._seq
         card.destroyed.connect(lambda *_: self._clear(seq))
         self.card = self._retain(card)
-        self.update_mini()
 
         # 무시할수록 에러창이 왼쪽 위로 겹겹이 쌓인다 (레퍼런스의 에러 폭탄 느낌)
         # 위치는 popup.py 의 WINDOW_POSITION (기본: 화면 가운데)
@@ -347,6 +346,7 @@ class App:
             g.show_at(base - QPoint(26 * i, 26 * i))
             self.ghosts.append(g)
         card.show_at(base)
+        self.update_mini()   # 캐릭터를 거북목 자세로 (카드가 보이는 상태여야 함)
 
     def _close_ghosts(self):
         for g in self.ghosts:
