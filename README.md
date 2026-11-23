@@ -14,7 +14,7 @@
 
 | 처음 실행 | 알림 | 했어요 | 오늘의 영수증 |
 |---|---|---|---|
-| ![](docs/screenshots/onboarding_pick.png) | ![](docs/screenshots/card.png) | ![](docs/screenshots/done.png) | ![](docs/screenshots/receipt.png) |
+| ![](docs/screenshots/onboarding_pick_v2.png) | ![](docs/screenshots/card_v2.png) | ![](docs/screenshots/done_v2.png) | ![](docs/screenshots/receipt_v2.png) |
 
 </div>
 
@@ -42,7 +42,7 @@
 
 ### 캐릭터와 숫자 창
 
-![](docs/screenshots/mini.png)
+![](docs/screenshots/mini_v2.png)
 
 화면 **오른쪽 아래**에 캐릭터가 떠 있어요. 평소엔 바른 자세로 앉아 있고, **알림이 뜨면 거북목 자세**로 바뀌어요.
 - 캐릭터를 **누르면** 숫자 창(남은 수술비 / 다음 알림까지 / 켜둔 시간)이 펼쳐져요. 다시 누르면 접혀요.
