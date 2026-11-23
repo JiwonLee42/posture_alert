@@ -36,3 +36,9 @@ class Repo:
             sql += " AND kind = ?"
             args.append(kind)
         return self.conn.execute(sql, args).fetchone()[0]
+
+    def events_today(self, today: datetime | None = None) -> list[tuple[str, str]]:
+        day = (today or datetime.now()).date().isoformat()
+        return self.conn.execute(
+            "SELECT kind, result FROM events WHERE ts LIKE ? ORDER BY id", (f"{day}%",)
+        ).fetchall()

@@ -1,4 +1,4 @@
-# 개발 가이드 — 바른자세 알리미 (Windows exe)
+# 개발 가이드 — 거북목 견적서 (Windows exe)
 
 > 대상: 백엔드 개발자, Mac에서 개발하고 Windows용 exe로 배포
 > 결론: **Python + PySide6 + PyInstaller**로 만듭니다.
@@ -308,14 +308,14 @@ class GuideCard(QWidget):
 
 ### 5.1 PyInstaller (Windows에서 실행)
 ```bash
-uv run pyinstaller --name 목펴 --windowed --icon assets/icon.ico --add-data "src/posture_alert/assets;assets" src/posture_alert/main.py
+uv run pyinstaller --name posture-alert --windowed --icon assets/icon.ico --add-data "src/posture_alert/assets;assets" src/posture_alert/main.py
 ```
 - `--windowed`: 검은 콘솔 창이 뜨지 않게 합니다.
 - `--onefile`보다 **기본(onedir) + 설치 파일** 조합을 추천합니다. onefile은 실행이 느리고 백신이 오탐하는 경우가 많습니다.
 - 에셋 경로는 실행 중에 `sys._MEIPASS`(PyInstaller 임시 경로)를 기준으로 찾아야 합니다.
 
 ### 5.2 설치 파일 — Inno Setup
-`dist/목펴/` 폴더를 `목펴-Setup.exe` 하나로 묶습니다. 시작 메뉴 바로가기와 제거 기능도 같이 생깁니다.
+`dist/posture-alert/` 폴더를 `거북목견적서-Setup.exe` 하나로 묶습니다. 시작 메뉴 바로가기와 제거 기능도 같이 생깁니다.
 
 ### 5.3 GitHub Actions로 자동 빌드
 ```yaml
