@@ -66,3 +66,58 @@ def test_예전_DB에_컬럼_자동_추가(tmp_path):
     row = r.get(1)
     assert row["completed"] == 1
     assert row["completed_at"] == "2026-11-24T09:00:00"
+
+
+# --- 단계 사이클 / 세션 ---
+from posture_alert.engine.stages import Stage  # noqa: E402
+
+
+def test_stages_테이블에_8단계_시드():
+    r = Repo(":memory:")
+    rows = r.conn.execute("SELECT id, code, exercise_id FROM stages ORDER BY id").fetchall()
+    assert [tuple(x) for x in rows][:2] == [(1, "EYE_FAR", "eye_far"), (2, "CHIN_TUCK", "chin_tuck")]
+    assert len(rows) == 8
+
+
+def test_사이클_행에_단계별_boolean_컬럼():
+    r = Repo(":memory:")
+    cid = r.new_cycle(None, ts=DAY)
+    assert all(v is False for v in r.cycle_checks(cid).values())
+    r.mark_stage_done(cid, Stage.NECK_SIDE)
+    checks = r.cycle_checks(cid)
+    assert checks[Stage.NECK_SIDE] is True
+    assert sum(checks.values()) == 1
+    assert r.get_cycle(cid)["stage_4"] == 1
+
+
+def test_사이클_위치_저장과_복원():
+    r = Repo(":memory:")
+    assert r.latest_cycle() is None
+    cid = r.new_cycle(None)
+    assert r.latest_cycle() == (cid, None)
+    r.set_position(cid, Stage.SEAT_BACK)
+    assert r.latest_cycle() == (cid, Stage.SEAT_BACK)
+
+
+def test_boolean_컬럼엔_0_1만():
+    r = Repo(":memory:")
+    cid = r.new_cycle(None)
+    with pytest.raises(sqlite3.IntegrityError):
+        r.conn.execute("UPDATE cycles SET stage_1 = 5 WHERE id = ?", (cid,))
+
+
+def test_켜둔_시간_분_저장():
+    r = Repo(":memory:")
+    sid = r.start_session(ts=DAY)
+    r.save_uptime(sid, 37, ts=datetime(2026, 11, 24, 10, 37))
+    sid2 = r.start_session(ts=datetime(2026, 11, 24, 14))
+    r.save_uptime(sid2, 5)
+    assert r.uptime_today(today=DAY) == 42
+
+
+def test_이벤트에_단계와_사이클_기록():
+    r = Repo(":memory:")
+    cid = r.new_cycle(None)
+    eid = r.create_event("posture", "chin_tuck", stage=Stage.CHIN_TUCK, cycle_id=cid)
+    row = r.get(eid)
+    assert row["stage"] == 2 and row["cycle_id"] == cid

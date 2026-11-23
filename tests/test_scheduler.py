@@ -98,3 +98,17 @@ def test_디버그_속도():
     t = datetime(2026, 1, 1)
     s.tick(Snapshot(t, 15))
     assert s.tick(Snapshot(t + timedelta(seconds=20), 15)) is Kind.EYE
+
+
+def test_사이클_모드는_20분마다_한번():
+    s = Scheduler.for_cycle(20)
+    s.tick(snap(0))
+    fired = [m for m in range(1, 81) if s.tick(snap(m))]
+    assert fired == [20, 40, 60, 80]
+
+
+def test_사이클_모드도_90분_착석이면_일어나기():
+    s = Scheduler.for_cycle(20)
+    s.tick(snap(0))
+    kinds = {m: s.tick(snap(m)) for m in range(1, 91)}
+    assert kinds[90] is Kind.STAND

@@ -1,9 +1,10 @@
-"""진입점: 트레이 아이콘 + 5초 타이머 + 알림 창 연결.
+"""진입점: 트레이 아이콘 + 타이머 + 단계 사이클 + 알림 창 연결.
 
 실행:
     uv run posture-alert                     # 일반 모드
     POSTURE_DEBUG=1 uv run posture-alert     # 1분 = 1초 (20초마다 눈 알림 ...)
-    uv run posture-alert --demo posture      # 바로 카드 띄우기 (eye/posture/stretch/stand)
+    uv run posture-alert --demo posture      # 바로 카드 띄우기 (eye/posture/stretch/stand/receipt 또는 단계 번호 1~8)
+    POSTURE_EVERY=20 uv run posture-alert    # 단계 하나당 간격(분), 기본 20
     uv run posture-alert --shot out.png --demo posture   # 카드 스크린샷 저장 후 종료
 """
 import os
@@ -16,8 +17,10 @@ from PySide6.QtGui import QColor, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from .engine.billing import build_receipt
-from .engine.content import (APP_NAME, APP_TAGLINE, ASSETS, load_exercises,
+from .engine.content import (APP_NAME, APP_TAGLINE, ASSETS, Message, load_exercises,
                              message_for, pick)
+from .engine.stages import STAGES, Stage, StageCycle
+from .engine.uptime import UptimeCounter
 from .engine.scheduler import Kind, Scheduler
 from .platform import get_monitor
 from .storage.repo import Repo
@@ -39,17 +42,18 @@ def data_path() -> Path:
 
 IGNORED = {"skip", "snooze", "timeout"}
 MAX_GHOSTS = 6
+CYCLE_EVERY_MINUTES = float(os.environ.get("POSTURE_EVERY", "20"))  # 단계 하나당 간격
 
 
 class App:
-    def __init__(self, qapp: QApplication, speed: float):
+    def __init__(self, qapp: QApplication, speed: float, repo: Repo | None = None):
         self.qapp = qapp
         self.speed = speed
         self.assets = assets_dir()
-        self.exercises = load_exercises(self.assets / "exercises.json")
-        self.scheduler = Scheduler.create(speed)
+        self.exercises = {e.id: e for e in load_exercises(self.assets / "exercises.json")}
+        self.scheduler = Scheduler.for_cycle(CYCLE_EVERY_MINUTES, speed)
         self.monitor = get_monitor()
-        self.repo = Repo(data_path())
+        self.repo = repo or Repo(data_path())
         self.card = None
         self.ghosts: list[GhostError] = []
         self.receipt_win = None
@@ -59,30 +63,71 @@ class App:
         self.character_pref = os.environ.get("POSTURE_CHARACTER")
         self._char_i = 0
 
+        # 켜둔 시간: 메모리 카운터 + 분이 바뀔 때만 sessions 행에 UPDATE
+        self.session_id = self.repo.start_session()
+        self.uptime = UptimeCounter()
+        # 단계 사이클: 마지막 사이클 위치를 DB에서 복원해 이어서 돈다
+        latest = self.repo.latest_cycle()
+        self.cycle = StageCycle(*latest) if latest else StageCycle()
+
         self.tray = QSystemTrayIcon(QIcon(sprite(ERROR_ICON, ERROR_PAL, 2)))
-        self.tray.setToolTip(f"{APP_NAME} - {APP_TAGLINE}")
         menu = QMenu()
         menu.addAction("오늘 견적서 보기", self.show_receipt)
         menu.addSeparator()
-        menu.addAction("지금 자세 체크", lambda: self.show(Kind.POSTURE))
-        menu.addAction("지금 스트레칭", lambda: self.show(Kind.STRETCH))
+        menu.addAction("다음 단계 바로 하기", self.show_next)
+        menu.addAction("일어나기", lambda: self.show_stage(Stage.STAND_WATER, interrupt=True))
         menu.addSeparator()
         menu.addAction("종료", qapp.quit)
         self.tray.setContextMenu(menu)
+        self._update_tooltip()
         self.tray.show()
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.on_tick)
         self.timer.start(5000 if speed == 1 else 1000)
 
+        self.uptime_timer = QTimer()
+        self.uptime_timer.timeout.connect(self.on_uptime)
+        self.uptime_timer.start(10_000)
+        qapp.aboutToQuit.connect(self.save_uptime)
+
+    # --- 켜둔 시간 ---
+    def on_uptime(self):
+        if self.uptime.poll() is not None:
+            self.save_uptime()
+
+    def save_uptime(self):
+        self.repo.save_uptime(self.session_id, self.uptime.minutes)
+        self._update_tooltip()
+
+    def _update_tooltip(self):
+        self.tray.setToolTip(f"{APP_NAME} - {APP_TAGLINE}\n켜둔 지 {self.uptime.minutes}분")
+
+    # --- 스케줄 ---
     def on_tick(self):
         was_sitting = self.scheduler.sitting_time(datetime.now())
         kind = self.scheduler.tick(self.monitor.snapshot())
         # 30분 이상 앉아 있다가 자리를 비웠으면 "일어남"으로 방어 처리
         if self.scheduler.sitting_since is None and was_sitting >= timedelta(minutes=30) / self.speed:
             self.repo.record(Kind.STAND.value, None, "away")
-        if kind and self.card is None:  # 이미 떠 있으면 겹쳐 띄우지 않음
-            self.show(kind)
+        if kind is None or self.card is not None:  # 이미 떠 있으면 겹쳐 띄우지 않음
+            return
+        if kind is Kind.STAND:
+            self.show_stage(Stage.STAND_WATER, interrupt=True)  # 오래 앉았으면 끼어들기
+        else:
+            self.show_next()
+
+    # --- 단계 사이클 ---
+    def advance_cycle(self) -> Stage:
+        had_empty_cycle = self.cycle.cycle_no and self.cycle.position is None
+        stage, new_cycle = self.cycle.advance()
+        if new_cycle and not had_empty_cycle:
+            self.cycle.cycle_no = self.repo.new_cycle(self.session_id)
+        self.repo.set_position(self.cycle.cycle_no, stage)
+        return stage
+
+    def show_next(self):
+        self.show_stage(self.advance_cycle())
 
     @property
     def character(self) -> str:
@@ -94,23 +139,33 @@ class App:
     def receipt(self):
         return build_receipt(self.repo.events_today())
 
-    def show(self, kind: Kind, alt: bool = False):
+    def show_stage(self, stage: Stage, interrupt: bool = False, alt: bool = False):
         if self.card is not None:
             self.card.close()
+        if not self.cycle.cycle_no:  # 아직 사이클이 없으면 하나 만든다
+            self.cycle.cycle_no = self.repo.new_cycle(self.session_id)
+        info = STAGES[stage]
+        kind = Kind(info.kind)
         now = datetime.now()
-        msg = message_for(kind, now, self.scheduler.sitting_minutes(now))
-        ex = pick(self.exercises, "seated_alt" if alt else kind.value)
+        if interrupt:  # 오래 앉아서 끼어든 일어나기: 앉아 있던 시간 멘트
+            msg = message_for(Kind.STAND, now, self.scheduler.sitting_minutes(now))
+        else:
+            msg = Message(info.title, info.body)
+        ex = pick(list(self.exercises.values()), "seated_alt") if alt else self.exercises[info.exercise_id]
+        cycle_no = self.cycle.cycle_no
+        cycle_info = (cycle_no, stage, self.repo.cycle_checks(cycle_no))
+
         if kind is Kind.EYE:
             card = LightToast(msg, ex)
         else:
             card = GuideCard(msg, ex, kind.value, self.assets, receipt=self.receipt(),
                              can_defer_stand=(kind is Kind.STAND and not alt),
-                             character=self.character)
+                             character=self.character, cycle=cycle_info)
         # POST: 알림을 띄우는 순간 기록 생성 (result='shown', completed=0)
-        event_id = self.repo.create_event(kind.value, ex.id)
+        event_id = self.repo.create_event(kind.value, ex.id, stage=stage, cycle_id=cycle_no)
         if kind is not Kind.EYE:
-            card.want_alternative.connect(lambda: self._switch_to_alt(event_id, kind))
-        card.answered.connect(lambda r: self.on_answer(event_id, kind, r))
+            card.want_alternative.connect(lambda: self._switch_to_alt(event_id, stage))
+        card.answered.connect(lambda r: self.on_answer(event_id, cycle_no, stage, r))
         self._seq += 1
         seq = self._seq
         card.destroyed.connect(lambda *_: self._clear(seq))
@@ -139,20 +194,22 @@ class App:
         if seq == self._seq:
             self.card = None
 
-    def _switch_to_alt(self, event_id: int, kind: Kind):
+    def _switch_to_alt(self, event_id: int, stage: Stage):
         self.repo.answer(event_id, "switched")
-        QTimer.singleShot(0, lambda: self.show(kind, alt=True))
+        QTimer.singleShot(0, lambda: self.show_stage(stage, interrupt=True, alt=True))
 
-    def on_answer(self, event_id: int, kind: Kind, result: str):
-        # PATCH: 같은 행을 업데이트 (done이면 completed=1, completed_at 기록)
+    def on_answer(self, event_id: int, cycle_no: int, stage: Stage, result: str):
+        # PATCH: events 행 업데이트 (done이면 completed=1, completed_at 기록)
         self.repo.answer(event_id, result)
         if result == "done":
+            # PATCH: 사이클 행의 stage_N 컬럼 = 1 (했음)
+            self.repo.mark_stage_done(cycle_no, stage)
             self.ignored_streak = 0
             self._close_ghosts()
         elif result in IGNORED:
             self.ignored_streak += 1
-        if result == "snooze":
-            QTimer.singleShot(int(5 * 60 * 1000 / self.speed), lambda: self.show(kind))
+        if result == "snooze":  # 같은 단계를 5분 뒤 다시 (사이클은 진행 안 함)
+            QTimer.singleShot(int(5 * 60 * 1000 / self.speed), lambda: self.show_stage(stage))
 
     def show_receipt(self):
         if self.receipt_win is not None:
@@ -160,7 +217,8 @@ class App:
                 self.receipt_win.close()
             except RuntimeError:
                 pass
-        self.receipt_win = ReceiptWindow(self.receipt())
+        self.save_uptime()
+        self.receipt_win = ReceiptWindow(self.receipt(), uptime_minutes=self.repo.uptime_today())
         self.receipt_win.show_at(self.receipt_win.bottom_right())
 
 
@@ -195,16 +253,26 @@ def main() -> None:
     if "--demo" in args:
         # 데모: 실제 기록을 건드리지 않게 메모리 DB + 예시 기록
         app.repo = Repo(":memory:")
+        app.session_id = app.repo.start_session()
+        app.uptime.started -= 137 * 60  # 2시간 17분 켜둔 것처럼
         for k, r in [("posture", "done")] * 4 + [("stretch", "done")] * 2 + \
                     [("stand", "away"), ("eye", "done"), ("stand", "skip"), ("posture", "snooze")]:
             app.repo.record(k, None, r)
+        app.cycle = StageCycle(app.repo.new_cycle(app.session_id))
         if "--ghosts" in args:
             app.ignored_streak = int(args[args.index("--ghosts") + 1])
         target = args[args.index("--demo") + 1]
+        demo_stage = {"eye": Stage.EYE_FAR, "posture": Stage.CHIN_TUCK,
+                      "stretch": Stage.SCAPULA_SQUEEZE, "stand": Stage.STAND_WATER}
         if target == "receipt":
             app.show_receipt()
         else:
-            app.show(Kind(target))
+            stage = Stage(int(target)) if target.isdigit() else demo_stage[target]
+            for done in Stage:  # 앞 단계들은 했다고 체크해 둔 상태로
+                if done < stage:
+                    app.repo.mark_stage_done(app.cycle.cycle_no, done)
+            app.cycle.position = stage
+            app.show_stage(stage, interrupt=(target == "stand"))
             if "--complete" in args:  # 완료 체크 화면 미리보기
                 app.card._complete()
     if "--shot" in args:

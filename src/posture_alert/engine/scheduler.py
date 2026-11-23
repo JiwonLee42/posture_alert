@@ -48,6 +48,17 @@ class Scheduler:
             stand_repeat=timedelta(minutes=30) / speed,
         )
 
+    @classmethod
+    def for_cycle(cls, every_minutes: float = 20, speed: float = 1.0) -> "Scheduler":
+        """단계 사이클 모드: every_minutes 마다 한 번(다음 단계), 연속 착석 90분이면 일어나기 끼어들기."""
+        never = timedelta(days=3650)
+        return cls(
+            intervals={Kind.EYE: timedelta(minutes=every_minutes) / speed,
+                       Kind.POSTURE: never, Kind.STRETCH: never,
+                       Kind.STAND: timedelta(minutes=90) / speed},
+            stand_repeat=timedelta(minutes=30) / speed,
+        )
+
     def tick(self, s: Snapshot) -> Kind | None:
         # 1) 자리 비움 → "일어남"으로 인정하고 모든 타이머 초기화
         if s.idle_seconds >= self.away_threshold.total_seconds():

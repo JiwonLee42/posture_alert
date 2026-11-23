@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QProgressBar,
 
 from ..engine.billing import DISCLAIMER, Receipt, price_of, won
 from ..engine.content import APP_NAME, APP_TAGLINE, Exercise, Message
+from ..engine.stages import Stage
 from .retro import (BAD_POSE, CHECK_ICON, CHECK_PAL, CHECKBOX_OFF, CHECKBOX_ON,
                     CHECKBOX_PAL, DARK, ERROR_ICON, ERROR_PAL, GOOD_POSE, NAVY,
                     POSE_PAL, WARNING, WARNING_PAL, retro_font, sprite)
@@ -151,6 +152,31 @@ def _tagline() -> QWidget:
     return box
 
 
+def _cycle_strip(cycle_no: int, current: Stage, checks: dict[Stage, bool]) -> QWidget:
+    """사이클 진행 표시: '사이클 #3 · 2/8단계' + 단계 1~8 체크박스 (지금 단계는 남색 번호)."""
+    box = QWidget()
+    row = QHBoxLayout(box)
+    row.setContentsMargins(0, 0, 0, 0)
+    row.setSpacing(6)
+    row.addWidget(_label(f"사이클 #{cycle_no} · {int(current)}/{len(Stage)}단계", 12))
+    row.addStretch()
+    for st in Stage:
+        cell = QVBoxLayout()
+        cell.setSpacing(1)
+        cb = QLabel()
+        cb.setPixmap(_checkbox(checks.get(st, False)))
+        cb.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        cb.setToolTip(st.name)
+        num = _label(str(int(st)), 11, color=NAVY if st == current else DARK)
+        num.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        if st == current:
+            num.setStyleSheet(f"color:{NAVY}; text-decoration: underline;")
+        cell.addWidget(cb)
+        cell.addWidget(num)
+        row.addLayout(cell)
+    return box
+
+
 def _checkbox(on: bool) -> QPixmap:
     return sprite(CHECKBOX_ON if on else CHECKBOX_OFF, CHECKBOX_PAL, 2)
 
@@ -213,7 +239,8 @@ class GuideCard(_RetroWindow):
 
     def __init__(self, msg: Message, ex: Exercise, kind: str, assets: Path,
                  receipt: Receipt | None = None, can_defer_stand: bool = False,
-                 character: str = "f"):
+                 character: str = "f",
+                 cycle: tuple[int, Stage, dict[Stage, bool]] | None = None):
         super().__init__(f"{EXE} - 응용 프로그램 오류")
         self.ex = ex
         self.setFixedWidth(440)
@@ -226,6 +253,11 @@ class GuideCard(_RetroWindow):
         self.body.addLayout(self.header.layout)
 
         self.body.addWidget(_tagline())
+        self.cycle = cycle
+        if cycle is not None:
+            strip = _cycle_strip(*cycle)
+            strip.setObjectName("cycleStrip")
+            self.body.addWidget(strip)
 
         imgs = QHBoxLayout()
         imgs.addStretch()
@@ -320,6 +352,14 @@ class GuideCard(_RetroWindow):
         self.timer_label.setText("완료")
         for box in self.step_boxes:
             box.setPixmap(_checkbox(True))
+        if self.cycle is not None:  # 사이클 표시에도 이번 단계 체크
+            no, cur, checks = self.cycle
+            old = self.findChild(QWidget, "cycleStrip")
+            new = _cycle_strip(no, cur, {**checks, cur: True})
+            new.setObjectName("cycleStrip")
+            if old is not None:
+                old.parentWidget().layout().replaceWidget(old, new)
+                old.deleteLater()
         self.header.icon.setPixmap(sprite(CHECK_ICON, CHECK_PAL, 3))
         self.header.title.setText("방어 완료!")
         self.header.body.setText(f"{self.ex.name} 완료로 기록했어요. 병원비 {won(self.price)}을 아꼈어요.")
@@ -401,7 +441,7 @@ class ReceiptWindow(_RetroWindow):
     """오늘의 척추 견적서."""
     WIDTH = 30  # 영수증 한 줄 글자 수 (고정폭)
 
-    def __init__(self, receipt: Receipt, now: datetime | None = None):
+    def __init__(self, receipt: Receipt, now: datetime | None = None, uptime_minutes: int | None = None):
         super().__init__(f"{APP_NAME} 견적서.txt - 메모장")
         self.setFixedWidth(360)
         self.title_bar.closed.connect(self.close)
@@ -409,7 +449,7 @@ class ReceiptWindow(_RetroWindow):
         paper.setObjectName("sunken")
         v = QVBoxLayout(paper)
         v.setContentsMargins(12, 10, 12, 10)
-        text = QLabel(self._render(receipt, now or datetime.now()))
+        text = QLabel(self._render(receipt, now or datetime.now(), uptime_minutes))
         mono = retro_font(13)
         mono.setFamilies(["Galmuri11", "D2Coding", "Menlo", "Consolas"])
         text.setFont(mono)
@@ -426,11 +466,15 @@ class ReceiptWindow(_RetroWindow):
         self.body.addLayout(row)
 
     @classmethod
-    def _render(cls, r: Receipt, now: datetime) -> str:
+    def _render(cls, r: Receipt, now: datetime, uptime_minutes: int | None = None) -> str:
         w = cls.WIDTH
         days = "월화수목금토일"
         out = [f"{APP_NAME} 견적서".center(w - 6), APP_TAGLINE.center(w - 8), f"{now:%Y-%m-%d} ({days[now.weekday()]}) {now:%H:%M}".center(w),
-               "-" * w, "[방어 내역]"]
+               "-" * w]
+        if uptime_minutes is not None:
+            h, m = divmod(uptime_minutes, 60)
+            out += [f"오늘 켜둔 시간  {h}시간 {m}분" if h else f"오늘 켜둔 시간  {m}분", "-" * w]
+        out += ["[방어 내역]"]
         out += [f"{l.name} x{l.count}  {won(l.amount)}" for l in r.saved] or ["  (없음)"]
         out += ["", "[청구 내역]"]
         out += [f"{l.name} x{l.count}  {won(l.amount)}" for l in r.billed] or ["  (없음)"]
