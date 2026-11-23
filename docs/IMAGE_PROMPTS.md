@@ -36,15 +36,15 @@ ChatGPT(이미지 생성), Gemini, Midjourney 어디서든 쓸 수 있게 영어
 
 | 단계 | 동작 id | 동작 | 여성(f) | 남성(m) |
 |---|---|---|---|---|
-| 1 | `eye_far` | 먼 곳 보기 | ⬜ | ⬜ |
-| 2 | `chin_tuck` | 턱 당기기 | ✅ 기본 그림 | ✅ 기본 그림 |
-| 3 | `shoulder_open` | 어깨 펴기 | ⬜ | ⬜ |
+| 1 | `eye_far` | 먼 곳 보기 | ✅ | ⬜ |
+| 2 | `chin_tuck` | 턱 당기기 | ✅ 새 메인 그림 | ✅ 기본 그림 |
+| 3 | `shoulder_open` | 어깨 펴기 | ✅ | ⬜ |
 | 4 | `neck_side` | 목 옆 늘리기 | ✅ | ✅ |
 | 5 | `scapula_squeeze` | 날개뼈 모으기 | ✅ | ✅ |
-| 6 | `seat_back` | 의자 위 허리 세우기 | ⬜ | ⬜ |
-| 7 | `ankle_pump` | 발목 펌프 | ⬜ | ⬜ |
-| 8 | `stand_water` | 일어나서 물 마시기 | ⬜ | ⬜ |
-| 대체 | `glute_squeeze` | 엉덩이 힘주기 ("지금 못 일어나요") | ⬜ | ⬜ |
+| 6 | `seat_back` | 의자 위 허리 세우기 | ✅ | ⬜ |
+| 7 | `ankle_pump` | 발목 펌프 | ✅ | ⬜ |
+| 8 | `stand_water` | 일어나서 물 마시기 | ✅ | ⬜ |
+| 대체 | `glute_squeeze` | 엉덩이 힘주기 ("지금 못 일어나요") | ✅ | ⬜ |
 
 ---
 
