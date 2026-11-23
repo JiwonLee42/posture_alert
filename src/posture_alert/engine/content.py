@@ -32,7 +32,7 @@ class Message:
     body: str
 
 
-APP_NAME = "거북목 견적서"
+APP_NAME = "척추수술3000"
 APP_SUBTITLE = "오늘 당신의 구부정한 목이 청구한 병원비"
 
 # 모든 문구는 존댓말. 금액은 billing.PRICE 와 맞춘다

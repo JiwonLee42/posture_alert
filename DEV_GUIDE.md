@@ -1,4 +1,4 @@
-# 개발 가이드 — 거북목 견적서 (Windows exe)
+# 개발 가이드 — 척추수술3000 (Windows exe)
 
 > 대상: 백엔드 개발자, Mac에서 개발하고 Windows용 exe로 배포
 > 결론: **Python + PySide6 + PyInstaller**로 만듭니다.
@@ -315,7 +315,7 @@ uv run pyinstaller --name posture-alert --windowed --icon assets/icon.ico --add-
 - 에셋 경로는 실행 중에 `sys._MEIPASS`(PyInstaller 임시 경로)를 기준으로 찾아야 합니다.
 
 ### 5.2 설치 파일 — Inno Setup
-`dist/posture-alert/` 폴더를 `거북목견적서-Setup.exe` 하나로 묶습니다. 시작 메뉴 바로가기와 제거 기능도 같이 생깁니다.
+`dist/posture-alert/` 폴더를 `척추수술3000-Setup.exe` 하나로 묶습니다. 시작 메뉴 바로가기와 제거 기능도 같이 생깁니다.
 
 ### 5.3 GitHub Actions로 자동 빌드
 ```yaml
