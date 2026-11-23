@@ -19,9 +19,8 @@ def qapp():
 def close(app):
     if app.card is not None:
         app.card._answer("skip")
-    app.timer.stop()
-    app.uptime_timer.stop()
-    app.tray.hide()
+    app.shutdown()
+    QApplication.processEvents()  # deleteLater 처리 (창 정리)
 
 
 def test_알림마다_다음_단계로_사이클(qapp, tmp_path):

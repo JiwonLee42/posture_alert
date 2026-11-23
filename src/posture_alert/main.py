@@ -71,14 +71,16 @@ class App:
         self.cycle = StageCycle(*latest) if latest else StageCycle()
 
         self.tray = QSystemTrayIcon(QIcon(sprite(ERROR_ICON, ERROR_PAL, 2)))
-        menu = QMenu()
+        # 메뉴는 self 에 붙잡아 둬야 함: 지역 변수면 __init__ 이 끝날 때 Python 이 지워서
+        # 트레이 메뉴가 사라지거나 종료 시 크래시 ("shared QObject was deleted directly")
+        self.menu = menu = QMenu()
         menu.addAction("오늘 견적서 보기", self.show_receipt)
         menu.addSeparator()
         menu.addAction("다음 단계 바로 하기", self.show_next)
         menu.addAction("일어나기", lambda: self.show_stage(Stage.STAND_WATER, interrupt=True))
         menu.addSeparator()
         menu.addAction("종료", qapp.quit)
-        self.tray.setContextMenu(menu)
+        self.tray.setContextMenu(self.menu)
         self._update_tooltip()
         self.tray.show()
 
@@ -89,12 +91,23 @@ class App:
         self.uptime_timer = QTimer()
         self.uptime_timer.timeout.connect(self.on_uptime)
         self.uptime_timer.start(10_000)
-        qapp.aboutToQuit.connect(self.save_uptime)
+        qapp.aboutToQuit.connect(self.shutdown)
 
     # --- 켜둔 시간 ---
     def on_uptime(self):
         if self.uptime.poll() is not None:
             self.save_uptime()
+
+    def shutdown(self):
+        """타이머·창·트레이 정리 (종료 시, 테스트 정리용)."""
+        self.save_uptime()
+        self.timer.stop()
+        self.uptime_timer.stop()
+        if self.card is not None:
+            self.card.close()
+        self._close_ghosts()
+        self.tray.hide()
+        self.tray.setContextMenu(None)
 
     def save_uptime(self):
         self.repo.save_uptime(self.session_id, self.uptime.minutes)
