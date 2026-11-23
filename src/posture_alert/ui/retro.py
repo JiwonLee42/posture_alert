@@ -75,7 +75,7 @@ QToolButton:pressed {{
     border-top:2px solid {BLACK}; border-left:2px solid {BLACK};
     border-bottom:2px solid {WHITE}; border-right:2px solid {WHITE};
 }}
-QPushButton#close {{ min-width:0; padding:0; font-weight:bold; }}
+QPushButton#close {{ min-width:26px; max-width:26px; min-height:22px; max-height:22px; padding:0; font-weight:bold; }}
 QFrame#sunken {{ background:{WHITE}; {_sunken()} }}
 QProgressBar {{
     background:{WHITE}; {_sunken()} min-height:18px; max-height:18px;

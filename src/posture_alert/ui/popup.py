@@ -42,17 +42,17 @@ class TitleBar(QWidget):
 
     def __init__(self, title: str, parent: QWidget):
         super().__init__(parent)
-        self.setFixedHeight(22)
+        self.setFixedHeight(28)
         self._drag: QPoint | None = None
         lay = QHBoxLayout(self)
         lay.setContentsMargins(4, 2, 2, 2)
         label = QLabel(title)
         label.setObjectName("titleText")
         label.setFont(retro_font(12, bold=True))
-        btn = QPushButton("×")
+        btn = QPushButton("X")
         btn.setObjectName("close")
-        btn.setFixedSize(18, 16)
-        btn.setFont(retro_font(12, bold=True))
+        btn.setFixedSize(26, 22)
+        btn.setFont(retro_font(18, bold=True))
         btn.clicked.connect(self.closed)
         lay.addWidget(label)
         lay.addStretch()
