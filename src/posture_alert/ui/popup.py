@@ -15,7 +15,8 @@ from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QProgressBar,
 
 from ..engine.billing import DISCLAIMER, Receipt, price_of, won
 from ..engine.content import APP_NAME, Exercise, Message
-from .retro import (BAD_POSE, DARK, ERROR_ICON, ERROR_PAL, GOOD_POSE, NAVY,
+from .retro import (BAD_POSE, CHECK_ICON, CHECK_PAL, CHECKBOX_OFF, CHECKBOX_ON,
+                    CHECKBOX_PAL, DARK, ERROR_ICON, ERROR_PAL, GOOD_POSE, NAVY,
                     POSE_PAL, WARNING, WARNING_PAL, retro_font, sprite)
 
 IMG_SIZE = 128
@@ -106,7 +107,18 @@ def _label(text: str, px: int = 13, bold: bool = False, color: str | None = None
     return lb
 
 
+class Header:
+    """아이콘 + 제목 + 본문 + 오류 코드. 완료 시 아이콘·문구를 바꿀 수 있게 참조를 들고 있음."""
+
+    def __init__(self, layout, icon, title, body):
+        self.layout, self.icon, self.title, self.body = layout, icon, title, body
+
+
 def _error_header(msg: Message, icon=ERROR_ICON, pal=ERROR_PAL, code: str = "") -> QHBoxLayout:
+    return _header(msg, icon, pal, code).layout
+
+
+def _header(msg: Message, icon=ERROR_ICON, pal=ERROR_PAL, code: str = "") -> Header:
     row = QHBoxLayout()
     row.setSpacing(14)
     icon_lb = QLabel()
@@ -114,13 +126,19 @@ def _error_header(msg: Message, icon=ERROR_ICON, pal=ERROR_PAL, code: str = "") 
     icon_lb.setAlignment(Qt.AlignmentFlag.AlignTop)
     text = QVBoxLayout()
     text.setSpacing(4)
-    text.addWidget(_label(msg.title, 15, bold=True))
-    text.addWidget(_label(msg.body, 13))
+    title = _label(msg.title, 15, bold=True)
+    body = _label(msg.body, 13)
+    text.addWidget(title)
+    text.addWidget(body)
     if code:
         text.addWidget(_label(code, 11, color=DARK))
     row.addWidget(icon_lb)
     row.addLayout(text, 1)
-    return row
+    return Header(row, icon_lb, title, body)
+
+
+def _checkbox(on: bool) -> QPixmap:
+    return sprite(CHECKBOX_ON if on else CHECKBOX_OFF, CHECKBOX_PAL, 2)
 
 
 def _button(text: str, primary: bool = False) -> QPushButton:
@@ -173,7 +191,9 @@ class GuideCard(_RetroWindow):
 
         price = price_of(kind)
         code = f"오류 코드 0x{price:05X} · {ERROR_CODES.get(kind, 'SPINE_ERROR')} · 청구 예정 {won(price)}"
-        self.body.addLayout(_error_header(msg, code=code))
+        self.price = price
+        self.header = _header(msg, code=code)
+        self.body.addLayout(self.header.layout)
 
         imgs = QHBoxLayout()
         imgs.addStretch()
@@ -183,8 +203,24 @@ class GuideCard(_RetroWindow):
         imgs.addStretch()
         self.body.addLayout(imgs)
 
-        self.steps = _label("\n".join(f"{i}. {s}" for i, s in enumerate(ex.steps, 1)))
-        self.body.addWidget(self.steps)
+        # 단계마다 Win95 체크박스: 타이머가 지나가면 하나씩 체크, 완료하면 전부 체크
+        self.step_boxes: list[QLabel] = []
+        steps_box = QVBoxLayout()
+        steps_box.setSpacing(4)
+        for i, text in enumerate(ex.steps, 1):
+            row = QHBoxLayout()
+            row.setSpacing(8)
+            box = QLabel()
+            box.setPixmap(_checkbox(False))
+            box.setAlignment(Qt.AlignmentFlag.AlignTop)
+            row.addWidget(box)
+            row.addWidget(_label(f"{i}. {text}"), 1)
+            steps_box.addLayout(row)
+            self.step_boxes.append(box)
+        self.steps = _label("")
+        self.steps.hide()
+        steps_box.addWidget(self.steps)
+        self.body.addLayout(steps_box)
 
         self.progress = QProgressBar()
         self.progress.setRange(0, ex.total_seconds)
@@ -197,7 +233,8 @@ class GuideCard(_RetroWindow):
         prow.addWidget(self.timer_label)
         self.body.addLayout(prow)
 
-        self.body.addWidget(_label(f"{ex.check}  이 자세가 되었나요?", 13, bold=True))
+        self.question = _label(f"{ex.check}  이 자세가 되었나요?", 13, bold=True)
+        self.body.addWidget(self.question)
 
         if receipt is not None:
             self.body.addWidget(_label(
@@ -206,7 +243,7 @@ class GuideCard(_RetroWindow):
 
         btns = QHBoxLayout()
         ok = _button(f"네, 맞췄어요 (+{won(price)})", primary=True)
-        ok.clicked.connect(lambda: self._answer("done"))
+        ok.clicked.connect(self._complete)
         if can_defer_stand:
             alt = _button("지금 못 일어나요")
             alt.clicked.connect(self._alternative)
@@ -215,7 +252,8 @@ class GuideCard(_RetroWindow):
             alt.clicked.connect(self._show_tip)
         later = _button("나중에 청구")
         later.clicked.connect(lambda: self._answer("snooze"))
-        for b in (ok, alt, later):
+        self.buttons = (ok, alt, later)
+        for b in self.buttons:
             btns.addWidget(b)
         self.body.addLayout(btns)
 
@@ -229,6 +267,10 @@ class GuideCard(_RetroWindow):
         self._elapsed = min(self._elapsed + 1, self.ex.total_seconds)
         self.progress.setValue(self._elapsed)
         self._render_time()
+        n = len(self.step_boxes)
+        for i, box in enumerate(self.step_boxes):
+            if self._elapsed >= self.ex.total_seconds * (i + 1) / n:
+                box.setPixmap(_checkbox(True))
         if self._elapsed >= self.ex.total_seconds:
             self._tick.stop()
 
@@ -236,7 +278,29 @@ class GuideCard(_RetroWindow):
         left = self.ex.total_seconds - self._elapsed
         self.timer_label.setText(f"{left // 60:02d}:{left % 60:02d}")
 
+    def _complete(self):
+        """'네, 맞췄어요' → 완료 체크 화면을 1.6초 보여주고 닫힘."""
+        if not self.isVisible():
+            return
+        self.answered.emit("done")
+        self._tick.stop()
+        self.progress.setValue(self.ex.total_seconds)
+        self.timer_label.setText("완료")
+        for box in self.step_boxes:
+            box.setPixmap(_checkbox(True))
+        self.header.icon.setPixmap(sprite(CHECK_ICON, CHECK_PAL, 3))
+        self.header.title.setText("방어 완료!")
+        self.header.body.setText(f"{self.ex.name} 완료로 기록했어요. 병원비 {won(self.price)}을 아꼈어요.")
+        self.question.setText("✔ 오늘 기록에 체크했어요")
+        self.question.setStyleSheet("color:#0b6b0b;")
+        for b in self.buttons:
+            b.setEnabled(False)
+        self.title_bar.closed.disconnect()
+        self.title_bar.closed.connect(self.close)
+        QTimer.singleShot(1600, self.close)
+
     def _show_tip(self):
+        self.steps.show()
         self.steps.setText("💡 " + (self.ex.tip or "거울이나 휴대폰 카메라로 옆모습을 확인해보세요."))
         self.answered.emit("unsure")
 

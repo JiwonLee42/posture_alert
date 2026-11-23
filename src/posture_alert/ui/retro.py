@@ -24,10 +24,12 @@ def retro_font(px: int = 12, bold: bool = False) -> QFont:
     f = QFont()
     f.setFamilies(FONT_FAMILIES)
     f.setPixelSize(px)
-    f.setBold(bold)
     if _has_pixel_font():
-        # 픽셀 폰트일 때만 계단 현상 그대로 (일반 한글 폰트는 끄면 글자가 깨짐)
+        # 픽셀 폰트: 계단 현상 그대로, 굵게는 끔 (굵은 글꼴이 없어서 가짜 굵게가 번짐)
         f.setStyleStrategy(QFont.StyleStrategy.NoAntialias)
+    else:
+        # 일반 한글 폰트는 안티앨리어싱을 끄면 글자가 깨짐
+        f.setBold(bold)
     return f
 
 
@@ -60,6 +62,7 @@ QPushButton:pressed {{
     border-bottom:2px solid {WHITE}; border-right:2px solid {WHITE};
 }}
 QPushButton#primary {{ border:3px solid {BLACK}; }}
+QPushButton:disabled {{ color:{DARK}; }}
 QPushButton#close {{ min-width:0; padding:0; font-weight:bold; }}
 QFrame#sunken {{ background:{WHITE}; {_sunken()} }}
 QProgressBar {{
@@ -155,3 +158,34 @@ BAD_POSE = [
 ]
 POSE_PAL = {"K": "#3a2a1a", "S": "#f5c9a0", "E": "#222222", "N": "#f5c9a0",
             "B": "#3b6fd8", "P": "#404040"}
+
+# 완료 표시용 초록 체크 아이콘
+CHECK_ICON = [
+    "            KK",
+    "           KGK",
+    "          KGGK",
+    "         KGGK ",
+    "        KGGK  ",
+    "KK     KGGK   ",
+    "KGK   KGGK    ",
+    "KGGK KGGK     ",
+    " KGGKGGK      ",
+    "  KGGGK       ",
+    "   KGK        ",
+    "    K         ",
+]
+CHECK_PAL = {"K": "#0b4d0b", "G": "#22b322"}
+
+# Win95 체크박스 (단계별 체크 표시)
+_BOX_TOP = ["DDDDDDDDDW", "DKKKKKKKGW"]
+_BOX_BOTTOM = ["DGGGGGGGGW", "WWWWWWWWWW"]
+CHECKBOX_OFF = _BOX_TOP + ["DKWWWWWWGW"] * 6 + _BOX_BOTTOM
+CHECKBOX_ON = _BOX_TOP + [
+    "DKWWWWWWGW",
+    "DKWWWWWKGW",
+    "DKWWWWKKGW",
+    "DKKWWKKWGW",
+    "DKKKKKWWGW",
+    "DKWKKWWWGW",
+] + _BOX_BOTTOM
+CHECKBOX_PAL = {"D": "#808080", "K": "#000000", "W": "#ffffff", "G": "#c0c0c0"}
