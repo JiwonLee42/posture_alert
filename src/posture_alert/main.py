@@ -8,6 +8,7 @@
     POSTURE_EVERY=20 uv run posture-alert    # 단계 하나당 간격(분), 기본 30
     uv run posture-alert --shot out.png --demo posture   # 카드 스크린샷 저장 후 종료
 """
+import math
 import os
 import sys
 from datetime import datetime, timedelta
@@ -24,7 +25,7 @@ from .engine.uptime import UptimeCounter
 from .engine.scheduler import Kind, Scheduler
 from .platform import get_monitor
 from .storage.repo import Repo
-from .ui.popup import CHARACTERS, GhostError, GuideCard, LightToast, Onboarding, ReceiptWindow
+from .ui.popup import CHARACTERS, GhostError, GuideCard, LightToast, Onboarding, MiniWidget, ReceiptWindow
 from .ui.retro import ERROR_ICON, ERROR_PAL, STYLESHEET, load_fonts, retro_font, sprite
 
 
@@ -65,6 +66,7 @@ class App:
         self.card = None
         self.ghosts: list[GhostError] = []
         self.receipt_win = None
+        self.mini = None
         self.ignored_streak = 0   # 연속으로 무시한 횟수 → 에러창이 그만큼 쌓인다
         self._seq = 0
         # 캐릭터: POSTURE_CHARACTER=f|m 이 있으면 그걸, 아니면 처음 실행 때 고른 값
@@ -85,6 +87,7 @@ class App:
         # 메뉴는 self 에 붙잡아 둬야 함: 지역 변수면 __init__ 이 끝날 때 Python 이 지워서
         # 트레이 메뉴가 사라지거나 종료 시 크래시 ("shared QObject was deleted directly")
         self.menu = menu = QMenu()
+        menu.addAction("미니 창 보이기/숨기기", self.toggle_mini)
         menu.addAction("오늘 견적서 보기", self.show_receipt)
         menu.addSeparator()
         menu.addAction("다음 단계 바로 하기", self.show_next)
@@ -93,6 +96,9 @@ class App:
         menu.addAction("종료", qapp.quit)
         self.tray.setContextMenu(self.menu)
         self._update_tooltip()
+        # 윈도우: 트레이 아이콘을 왼쪽 클릭하면 미니 창 열기/닫기 (맥은 클릭하면 메뉴가 열림)
+        self.tray.activated.connect(
+            lambda r: self.toggle_mini() if r == QSystemTrayIcon.ActivationReason.Trigger else None)
         self.tray.show()
 
         self.timer = QTimer()
@@ -107,11 +113,48 @@ class App:
 
         if not self.started:
             QTimer.singleShot(0, self.show_onboarding)
+        elif self.repo.get_setting("mini_hidden") != "1":
+            QTimer.singleShot(0, self.show_mini)
 
     # --- 켜둔 시간 ---
     def on_uptime(self):
         if self.uptime.poll() is not None:
             self.save_uptime()
+        self.update_mini()
+
+    # --- 미니 리마인더 창 (화면 오른쪽 아래, 옮길 수 있음) ---
+    def show_mini(self):
+        if not self.started:
+            return
+        if self.mini is None:
+            self.mini = self._retain(MiniWidget())
+            self.mini.moved_to.connect(lambda x, y: self.repo.set_setting("mini_pos", f"{x},{y}"))
+            self.mini.hidden_by_user.connect(lambda: self.repo.set_setting("mini_hidden", "1"))
+            self.mini.destroyed.connect(lambda *_: setattr(self, "mini", None))
+        self.repo.set_setting("mini_hidden", "0")
+        self.update_mini()
+        saved = self.repo.get_setting("mini_pos")
+        if saved:
+            x, y = (int(v) for v in saved.split(","))
+            pos = self.mini.clamp_pos(x, y)
+        else:
+            pos = self.mini.bottom_right()
+        self.mini.show_at(pos)
+
+    def toggle_mini(self):
+        if self.mini is not None and self.mini.isVisible():
+            self.mini.hide()
+            self.repo.set_setting("mini_hidden", "1")
+        else:
+            self.show_mini()
+
+    def update_mini(self):
+        if self.mini is None or not self.started:
+            return
+        left = self.scheduler.next_in(datetime.now())
+        # 빠른 모드(speed>1)에서는 화면에 보이는 분도 같은 배율로
+        mins = None if left is None else math.ceil(left.total_seconds() * self.speed / 60)
+        self.mini.refresh(self.remaining(), mins, self.uptime.minutes)
 
     def on_quit(self):
         self.shutdown()
@@ -128,6 +171,8 @@ class App:
         self._close_ghosts()
         if self.onboarding is not None:
             self.onboarding.close()
+        if self.mini is not None:
+            self.mini.close()
         self.tray.hide()
         self.tray.setContextMenu(None)
 
@@ -198,6 +243,7 @@ class App:
         if self.onboarding is not None:
             self.onboarding.close()  # _alive 가 붙잡고 있다가 destroyed 때 놓음
         self.onboarding = None
+        self.show_mini()
         QTimer.singleShot(300, self.show_next)  # 시작하자마자 첫 알림 한 번, 그 뒤로는 30분마다
 
     def receipt(self):
@@ -258,6 +304,7 @@ class App:
         QTimer.singleShot(0, lambda: self.show_stage(stage, interrupt=True, alt=True))
 
     def on_answer(self, event_id: int, cycle_no: int, stage: Stage, result: str):
+        QTimer.singleShot(0, self.update_mini)  # 답한 결과(수술비)를 미니 창에 반영
         # PATCH: events 행 업데이트 (done이면 completed=1, completed_at 기록)
         self.repo.answer(event_id, result)
         if result == "done":
@@ -285,7 +332,7 @@ def save_shot(app: "App", out: str) -> None:
     """떠 있는 창들(겹친 에러창 포함)을 한 장의 이미지로 저장 (데모·문서용)."""
     from PySide6.QtCore import QRect
     from PySide6.QtGui import QPainter, QPixmap
-    wins = [w for w in [*app.ghosts, app.card, app.receipt_win, app.onboarding]
+    wins = [w for w in [*app.ghosts, app.card, app.receipt_win, app.onboarding, app.mini]
             if w is not None and w.isVisible()]
     rect = QRect()
     for w in wins:

@@ -94,6 +94,13 @@ class Scheduler:
     def sitting_minutes(self, now: datetime) -> int:
         return int(self.sitting_time(now).total_seconds() // 60)
 
+    def next_in(self, now: datetime, kind: Kind = Kind.EYE) -> timedelta | None:
+        """kind 알림이 뜨기까지 남은 시간 (이미 지났으면 0, 아직 앉기 시작 전이면 None)."""
+        last = self.last_fired.get(kind, self.sitting_since)
+        if last is None:
+            return None
+        return max(timedelta(0), self.intervals[kind] - (now - last))
+
     def _is_due(self, k: Kind, now: datetime) -> bool:
         last = self.last_fired.get(k, self.sitting_since)
         if k is Kind.STAND:
