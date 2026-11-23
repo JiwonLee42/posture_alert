@@ -20,7 +20,13 @@ from ..engine.content import APP_NAME, APP_TAGLINE, Exercise, Message
 from .retro import (BAD_POSE, DARK, ERROR_ICON, ERROR_PAL, GOOD_POSE, NAVY,
                     POSE_PAL, WARNING, WARNING_PAL, retro_font, sprite)
 
+# ---- 화면 조절용 설정값 (여기 숫자만 바꾸면 됨) ----
+CARD_W = 420             # 알림 창 폭
+TITLE_PX = 30            # 맨 위 "척추수술3000" 글자 크기
 IMG_W, IMG_H = 176, 200  # 그림 칸 크기 (기본 그림 400:372, 스트레칭 그림 세로형도 들어가게)
+BUTTON_W = 140           # 버튼 폭 (가운데 정렬, 모두 같은 폭)
+BUTTON_W_3 = 118         # 버튼이 3개일 때(일어나기: 했어요/못 일어나요/나중에) 폭
+BUTTON_GAP = 12          # 버튼 사이 간격
 EXE = f"{APP_NAME}.exe"
 ERROR_CODES = {
     "posture": "TURTLE_NECK_OVERFLOW",
@@ -198,7 +204,7 @@ def image_panel(pm: QPixmap, caption: str) -> QWidget:
     return box
 
 
-def _big_title(px: int = 30) -> QLabel:
+def _big_title(px: int = TITLE_PX) -> QLabel:
     lb = _label(APP_NAME, px, bold=True)
     lb.setAlignment(Qt.AlignmentFlag.AlignCenter)
     return lb
@@ -240,7 +246,7 @@ class GuideCard(_RetroWindow):
         self.ex = ex
         self.price = price_of(kind)
         self.remaining = remaining
-        self.setFixedWidth(420)
+        self.setFixedWidth(CARD_W)
         self.title_bar.closed.connect(lambda: self._answer("skip"))
 
         self.body.addWidget(_big_title())
@@ -263,6 +269,7 @@ class GuideCard(_RetroWindow):
         self.body.addWidget(self.question)
 
         btns = QHBoxLayout()
+        btns.setSpacing(BUTTON_GAP)
         ok = _button(f"했어요 (-{won(self.price)})", primary=True)
         ok.clicked.connect(self._complete)
         self.buttons = [ok]
@@ -273,8 +280,13 @@ class GuideCard(_RetroWindow):
         later = _button("나중에")
         later.clicked.connect(lambda: self._answer("snooze"))
         self.buttons.append(later)
+        # 가운데 정렬: 양옆에 빈 공간(stretch)을 넣고 버튼 폭은 고정
+        btns.addStretch()
+        width = BUTTON_W if len(self.buttons) <= 2 else BUTTON_W_3
         for b in self.buttons:
+            b.setFixedWidth(width)
             btns.addWidget(b)
+        btns.addStretch()
         self.body.addLayout(btns)
 
     def _complete(self):
