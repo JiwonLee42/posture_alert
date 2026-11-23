@@ -204,3 +204,18 @@ def test_트레이로_캐릭터를_숨기고_다시_보인다(qapp, tmp_path):
     app.toggle_mini()
     assert app.pet.isVisible()
     close(app)
+
+
+def test_앞_알림에_답_안_해도_다음_시각에_다음_단계로_넘어간다(qapp, tmp_path):
+    app = started_app(qapp, tmp_path)
+    app.fire(Kind.EYE)                       # 1단계
+    first = app.cycle.position
+    for _ in range(3):
+        app.fire(Kind.EYE)                   # 답을 한 번도 안 눌러도
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    QApplication.processEvents()
+    assert app.cycle.position == first + 3   # 단계가 계속 넘어간다
+    rows = app.repo.conn.execute("SELECT stage, result FROM events ORDER BY id").fetchall()
+    assert [tuple(r) for r in rows][:3] == [(1, "timeout"), (2, "timeout"), (3, "timeout")]
+    assert app.remaining() == SURGERY_COST   # 3000만원 위로는 안 올라감
+    close(app)
