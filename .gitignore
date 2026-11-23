@@ -27,3 +27,9 @@ Thumbs.db
 # 받은 원본 그림 (잘라서 assets/img 에 넣은 뒤엔 필요 없음)
 inbox/*
 !inbox/.gitkeep
+
+# 내부 문서 (로컬에만 둠, 저장소에는 올리지 않음)
+PRD.md
+DEV_GUIDE.md
+docs/DEVELOPMENT.md
+docs/IMAGE_PROMPTS.md
