@@ -5,7 +5,7 @@
     POSTURE_DEBUG=1 uv run posture-alert     # 1분 = 1초 (20초마다 다음 단계 ...)
     POSTURE_EVERY_SECONDS=3 uv run posture-alert   # 테스트: 3초마다 다음 단계
     uv run posture-alert --demo posture      # 바로 카드 띄우기 (eye/posture/stretch/stand/receipt 또는 단계 번호 1~8)
-    POSTURE_EVERY=20 uv run posture-alert    # 단계 하나당 간격(분), 기본 20
+    POSTURE_EVERY=20 uv run posture-alert    # 단계 하나당 간격(분), 기본 30
     uv run posture-alert --shot out.png --demo posture   # 카드 스크린샷 저장 후 종료
 """
 import os
@@ -42,7 +42,7 @@ def data_path() -> Path:
 
 IGNORED = {"skip", "snooze", "timeout"}
 MAX_GHOSTS = 6
-CYCLE_EVERY_MINUTES = float(os.environ.get("POSTURE_EVERY", "20"))  # 단계 하나당 간격(분)
+CYCLE_EVERY_MINUTES = float(os.environ.get("POSTURE_EVERY", "30"))  # 단계 하나당 간격(분)
 # 테스트용: POSTURE_EVERY_SECONDS=3 이면 3초마다 다음 단계 (타이핑 중 대기도 끔)
 TEST_EVERY_SECONDS = float(os.environ.get("POSTURE_EVERY_SECONDS", "0"))
 # 종료할 때 DB 기록을 모두 지움 (POSTURE_KEEP_DATA=1 이면 남김)
