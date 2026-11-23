@@ -219,3 +219,19 @@ def test_앞_알림에_답_안_해도_다음_시각에_다음_단계로_넘어�
     assert [tuple(r) for r in rows][:3] == [(1, "timeout"), (2, "timeout"), (3, "timeout")]
     assert app.remaining() == SURGERY_COST   # 3000만원 위로는 안 올라감
     close(app)
+
+
+def test_알림은_정확히_30분_간격이고_일어나기가_단계를_삼키지_않는다():
+    sch = Scheduler.for_cycle(30)
+    t = datetime(2026, 1, 5, 9, 0)
+    fired = []
+    while t < datetime(2026, 1, 5, 9, 0) + timedelta(hours=9):
+        k = sch.tick(Snapshot(now=t, idle_seconds=30))
+        if k is not None:
+            fired.append((t, k))
+        t += timedelta(seconds=30)
+    gaps = {(b[0] - a[0]) for a, b in zip(fired, fired[1:])}
+    assert gaps == {timedelta(minutes=30)}                    # 너무 자주 오지 않는다
+    stands = [i for i, (_, k) in enumerate(fired) if k is Kind.STAND]
+    assert stands == [2, 5, 8, 11, 14]                    # 3번에 한 번(90분마다)만 일어나기
+    assert len(fired) - len(stands) >= 10                     # 나머지는 모두 단계 알림

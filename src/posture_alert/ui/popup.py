@@ -482,8 +482,9 @@ class PetWidget(QWidget):
     HEIGHT = 230
 
     def __init__(self, assets: Path, character: str = "f"):
-        super().__init__(None, Qt.WindowType.FramelessWindowHint
-                         | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
+        # Tool 창이 아니라 일반 창으로 만들어야 작업표시줄에 버튼(앱 아이콘)이 생긴다
+        super().__init__(None, Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        self.setWindowTitle(APP_NAME)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.setAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow)
