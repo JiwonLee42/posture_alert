@@ -22,6 +22,7 @@ from .retro import (BAD_POSE, DARK, MONO_FAMILIES, ERROR_ICON, ERROR_PAL, GOOD_P
 
 # ---- 화면 조절용 설정값 (여기 숫자만 바꾸면 됨) ----
 CARD_W = 420             # 알림 창 폭
+AUTO_CLOSE_SECONDS = 10  # 알림 창을 이 시간 동안 안 누르면 '무시'로 자동 닫힘 (0 = 자동으로 안 닫힘)
 TITLE_PX = 30            # 맨 위 "척추수술3000" 글자 크기
 IMG_W, IMG_H = 176, 200  # 그림 칸 크기 (기본 그림 400:372, 스트레칭 그림 세로형도 들어가게)
 BUTTON_W = 140           # 버튼 폭 (가운데 정렬, 모두 같은 폭)
@@ -266,6 +267,8 @@ class GuideCard(_RetroWindow):
         self.remaining = remaining
         self.setFixedWidth(CARD_W)
         self.title_bar.closed.connect(lambda: self._answer("skip"))
+        if AUTO_CLOSE_SECONDS > 0:
+            self.later(AUTO_CLOSE_SECONDS * 1000, lambda: self._answer("timeout"))
 
         self.body.addWidget(_big_title())
         self.amount = AmountBar(remaining)
@@ -328,8 +331,9 @@ class GuideCard(_RetroWindow):
         self.close()
 
     def _answer(self, result: str):
-        self.answered.emit(result)
-        self.close()
+        if self.isVisible():
+            self.answered.emit(result)
+            self.close()
 
 
 GHOST_LINES = [
