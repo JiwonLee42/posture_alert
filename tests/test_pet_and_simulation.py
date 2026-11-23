@@ -170,6 +170,19 @@ def test_트레이로_영수증을_열었다_닫아도_앱은_안_꺼진다(qapp
     close(app)
 
 
+def test_종료_확인_중에는_알림이_뜨지_않는다(qapp, tmp_path):
+    app = started_app(qapp, tmp_path)
+    app.ask_quit()
+    app.show_next()                      # 알림 시각이 됐어도
+    assert app.card is None              # 종료가 우선
+    app.confirm._no()
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    QApplication.processEvents()
+    app.show_next()                      # 취소하면 다시 알림이 뜬다
+    assert app.card is not None
+    close(app)
+
+
 def test_트레이로_캐릭터를_숨기고_다시_보인다(qapp, tmp_path):
     app = started_app(qapp, tmp_path)
     app.toggle_mini()

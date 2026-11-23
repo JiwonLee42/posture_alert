@@ -299,7 +299,14 @@ class App:
     def receipt(self):
         return build_receipt(self.repo.events_today())
 
+    @property
+    def quitting(self) -> bool:
+        """종료 확인 창이 떠 있거나, 영수증을 보여 준 뒤 종료하는 중이면 True (알림보다 종료가 우선)."""
+        return self.confirm is not None or self.receipt_win_quits
+
     def show_stage(self, stage: Stage, interrupt: bool = False, alt: bool = False):
+        if self.quitting:   # 종료 흐름 중에는 새 알림을 띄우지 않음
+            return
         if self.card is not None:
             self.card.close()
         if not self.cycle.cycle_no:  # 아직 사이클이 없으면 하나 만든다

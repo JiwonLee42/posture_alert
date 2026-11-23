@@ -479,7 +479,7 @@ class PetWidget(QWidget):
     clicked = Signal()
     moved = Signal()              # 옮기는 중 (숫자 창이 따라오게)
     moved_to = Signal(int, int)   # 옮긴 뒤 위치 (기억해 두기용)
-    HEIGHT = 130
+    HEIGHT = 170
 
     def __init__(self, assets: Path, character: str = "f"):
         super().__init__(None, Qt.WindowType.FramelessWindowHint
