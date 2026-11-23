@@ -11,7 +11,7 @@
 
 ## 설치
 
-1. [Releases](../../releases)에서 가장 위(최신) 버전의 **척추수술3000-windows.zip**을 받아요.
+1. [Releases](../../releases)에서 가장 위(최신) 버전의 **posture-alert-windows.zip**을 받아요.
 2. 압축을 풀고 **`posture-alert.exe`**를 실행해요. 설치는 필요 없어요.
 3. 윈도우가 "PC를 보호했습니다" 경고를 띄우면 **추가 정보 → 실행**을 눌러요. (서명이 없는 앱이라 처음에만 떠요.)
 
