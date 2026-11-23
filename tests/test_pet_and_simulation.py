@@ -129,13 +129,44 @@ def test_캐릭터를_끌면_옮겨지고_숫자창은_안_열린다(qapp, tmp_p
     close(app)
 
 
-def test_숫자창_X를_누르면_영수증이_뜬다(qapp, tmp_path):
+def test_숫자창_X를_누르면_종료할지_물어본다(qapp, tmp_path):
     app = started_app(qapp, tmp_path)
-    app.repo.record("posture", None, "done")
     QTest.mouseClick(app.pet, Qt.MouseButton.LeftButton)       # 숫자 창 열기
     app.mini._hide_clicked()                                    # X
-    assert app.receipt_win is not None and app.receipt_win.isVisible()
+    assert app.confirm is not None and app.confirm.isVisible()
     assert not app.mini.isVisible()
+    assert app.receipt_win is None                              # 아직 영수증은 안 뜸
+    app.confirm._no()                                           # 아니요 → 아무 일 없음
+    assert app.pet.isVisible()
+    close(app)
+
+
+def test_종료_예를_누르면_영수증이_뜨고_닫으면_앱이_종료(qapp, tmp_path, monkeypatch):
+    app = started_app(qapp, tmp_path)
+    app.repo.record("posture", None, "done")
+    quits = []
+    monkeypatch.setattr(app.qapp, "quit", lambda: quits.append(1))
+    QTest.mouseClick(app.pet, Qt.MouseButton.LeftButton)
+    app.mini._hide_clicked()
+    app.confirm._yes()
+    assert app.receipt_win is not None and app.receipt_win.isVisible()
+    assert quits == []                                          # 영수증을 보는 동안은 안 꺼짐
+    app.receipt_win.close()
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    QApplication.processEvents()
+    assert quits == [1]
+    close(app)
+
+
+def test_트레이로_영수증을_열었다_닫아도_앱은_안_꺼진다(qapp, tmp_path, monkeypatch):
+    app = started_app(qapp, tmp_path)
+    quits = []
+    monkeypatch.setattr(app.qapp, "quit", lambda: quits.append(1))
+    app.show_receipt()
+    app.receipt_win.close()
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    QApplication.processEvents()
+    assert quits == []
     close(app)
 
 
