@@ -25,6 +25,7 @@ jobs:
       - name: Build exe (PyInstaller)
         run: >
           uv run pyinstaller --noconfirm --name posture-alert --windowed
+          --icon src/posture_alert/assets/icon.ico
           --add-data "src/posture_alert/assets;assets"
           src/posture_alert/__main__.py
 

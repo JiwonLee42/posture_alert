@@ -81,7 +81,7 @@ class App:
         latest = self.repo.latest_cycle()
         self.cycle = StageCycle(*latest) if latest else StageCycle()
 
-        self.tray = QSystemTrayIcon(QIcon(sprite(ERROR_ICON, ERROR_PAL, 2)))
+        self.tray = QSystemTrayIcon(app_icon(self.assets))
         # 메뉴는 self 에 붙잡아 둬야 함: 지역 변수면 __init__ 이 끝날 때 Python 이 지워서
         # 트레이 메뉴가 사라지거나 종료 시 크래시 ("shared QObject was deleted directly")
         self.menu = menu = QMenu()
@@ -299,6 +299,11 @@ def save_shot(app: "App", out: str) -> None:
     pm.save(out)
 
 
+def app_icon(assets: Path) -> QIcon:
+    f = assets / "icon.png"
+    return QIcon(str(f)) if f.exists() else QIcon(sprite(ERROR_ICON, ERROR_PAL, 2))
+
+
 def main() -> None:
     qapp = QApplication(sys.argv)
     qapp.setApplicationName("posture-alert")  # DB 폴더 이름 고정
@@ -315,6 +320,7 @@ def main() -> None:
             print("척추수술3000은 이미 실행 중이에요. 트레이(메뉴바) 아이콘을 확인해 주세요.")
             sys.exit(0)
 
+    qapp.setWindowIcon(app_icon(assets_dir()))
     load_fonts(assets_dir())
     qapp.setFont(retro_font(12))  # 따로 지정 안 한 글자도 설치된 폰트로 (기본 "Sans Serif" 찾느라 느려지는 것 방지)
     qapp.setStyleSheet(STYLESHEET)
