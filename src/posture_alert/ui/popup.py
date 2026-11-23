@@ -27,6 +27,7 @@ IMG_W, IMG_H = 176, 200  # 그림 칸 크기 (기본 그림 400:372, 스트레�
 BUTTON_W = 140           # 버튼 폭 (가운데 정렬, 모두 같은 폭)
 BUTTON_W_3 = 118         # 버튼이 3개일 때(일어나기: 했어요/못 일어나요/나중에) 폭
 BUTTON_GAP = 12          # 버튼 사이 간격
+WINDOW_POSITION = "center"  # 알림 창 위치: "center"(화면 가운데) / "bottom_right"(오른쪽 아래)
 EXE = f"{APP_NAME}.exe"
 ERROR_CODES = {
     "posture": "TURTLE_NECK_OVERFLOW",
@@ -109,6 +110,15 @@ class _RetroWindow(QWidget):
         t.setSingleShot(True)
         t.timeout.connect(fn)
         t.start(ms)
+
+    def home_pos(self) -> QPoint:
+        """WINDOW_POSITION 설정에 따른 창 위치."""
+        return self.centered() if WINDOW_POSITION == "center" else self.bottom_right()
+
+    def centered(self) -> QPoint:
+        self.fit()
+        geo = self.screen().availableGeometry()
+        return QPoint(geo.center().x() - self.width() // 2, geo.center().y() - self.height() // 2)
 
     def bottom_right(self, offset: int = 0) -> QPoint:
         self.fit()
@@ -441,9 +451,7 @@ class Onboarding(_RetroWindow):
         self.body.addWidget(self.stack)
 
     def center(self):
-        self.fit()
-        geo = self.screen().availableGeometry()
-        self.move(geo.center() - self.rect().center())
+        self.move(self.centered())
 
     def _pick_page(self) -> QWidget:
         page = QWidget()

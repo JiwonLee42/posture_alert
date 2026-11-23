@@ -229,7 +229,8 @@ class App:
         self.card = self._retain(card)
 
         # 무시할수록 에러창이 왼쪽 위로 겹겹이 쌓인다 (레퍼런스의 에러 폭탄 느낌)
-        base = card.bottom_right()
+        # 위치는 popup.py 의 WINDOW_POSITION (기본: 화면 가운데)
+        base = card.home_pos()
         self._close_ghosts()
         n = min(self.ignored_streak, MAX_GHOSTS)
         for i in range(n, 0, -1):
@@ -276,7 +277,7 @@ class App:
                 pass
         self.save_uptime()
         self.receipt_win = self._retain(ReceiptWindow(self.receipt(), uptime_minutes=self.repo.uptime_today()))
-        self.receipt_win.show_at(self.receipt_win.bottom_right())
+        self.receipt_win.show_at(self.receipt_win.home_pos())
 
 
 def save_shot(app: "App", out: str) -> None:
