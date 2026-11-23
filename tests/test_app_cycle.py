@@ -113,3 +113,17 @@ def test_종료하면_DB_초기화(qapp, tmp_path):
     r = Repo(db)
     for t in ("events", "cycles", "sessions", "settings"):
         assert r.conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] == 0
+
+
+def test_눈휴식_창을_먼저_닫아도_자동닫힘이_에러안남(qapp, tmp_path):
+    from posture_alert.ui.popup import LightToast
+    ex = App(qapp, 1.0, repo=Repo(tmp_path / "h.sqlite3"))
+    toast = LightToast(ex.exercises["eye_far"], 30_000_000, auto_close_ms=50)
+    toast.show()
+    toast._answer("done")                 # 먼저 닫힘 → 지워짐
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    import time
+    end = time.monotonic() + 0.2
+    while time.monotonic() < end:         # 자동 닫힘 시각이 지나도록 이벤트 처리
+        QApplication.processEvents()
+    close(ex)

@@ -2,7 +2,8 @@
 
 실행:
     uv run posture-alert                     # 일반 모드
-    POSTURE_DEBUG=1 uv run posture-alert     # 1분 = 1초 (20초마다 눈 알림 ...)
+    POSTURE_DEBUG=1 uv run posture-alert     # 1분 = 1초 (20초마다 다음 단계 ...)
+    POSTURE_EVERY_SECONDS=3 uv run posture-alert   # 테스트: 3초마다 다음 단계
     uv run posture-alert --demo posture      # 바로 카드 띄우기 (eye/posture/stretch/stand/receipt 또는 단계 번호 1~8)
     POSTURE_EVERY=20 uv run posture-alert    # 단계 하나당 간격(분), 기본 20
     uv run posture-alert --shot out.png --demo posture   # 카드 스크린샷 저장 후 종료
@@ -41,7 +42,9 @@ def data_path() -> Path:
 
 IGNORED = {"skip", "snooze", "timeout"}
 MAX_GHOSTS = 6
-CYCLE_EVERY_MINUTES = float(os.environ.get("POSTURE_EVERY", "20"))  # 단계 하나당 간격
+CYCLE_EVERY_MINUTES = float(os.environ.get("POSTURE_EVERY", "20"))  # 단계 하나당 간격(분)
+# 테스트용: POSTURE_EVERY_SECONDS=3 이면 3초마다 다음 단계 (타이핑 중 대기도 끔)
+TEST_EVERY_SECONDS = float(os.environ.get("POSTURE_EVERY_SECONDS", "0"))
 # 종료할 때 DB 기록을 모두 지움 (POSTURE_KEEP_DATA=1 이면 남김)
 RESET_ON_EXIT = os.environ.get("POSTURE_KEEP_DATA") != "1"
 
@@ -52,7 +55,11 @@ class App:
         self.speed = speed
         self.assets = assets_dir()
         self.exercises = {e.id: e for e in load_exercises(self.assets / "exercises.json")}
-        self.scheduler = Scheduler.for_cycle(CYCLE_EVERY_MINUTES, speed)
+        if TEST_EVERY_SECONDS:
+            self.scheduler = Scheduler.for_cycle(TEST_EVERY_SECONDS / 60)
+            self.scheduler.typing_grace_seconds = 0  # 마우스를 움직이고 있어도 바로 뜨게
+        else:
+            self.scheduler = Scheduler.for_cycle(CYCLE_EVERY_MINUTES, speed)
         self.monitor = get_monitor()
         self.repo = repo or Repo(data_path())
         self.card = None
@@ -90,7 +97,8 @@ class App:
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.on_tick)
-        self.timer.start(5000 if speed == 1 else 1000)
+        # 몇 초마다 "띄울 때 됐나?" 확인할지: 평소 5초, 빠른 모드 1초, 초 단위 테스트 0.5초
+        self.timer.start(500 if TEST_EVERY_SECONDS else 5000 if speed == 1 else 1000)
 
         self.uptime_timer = QTimer()
         self.uptime_timer.timeout.connect(self.on_uptime)
