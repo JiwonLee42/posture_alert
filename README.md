@@ -4,6 +4,8 @@
 
 **기억하자, 척추수술 3000만원**
 
+[![최신 버전](https://img.shields.io/github/v/release/JiwonLee42/posture_alert?label=%EC%B5%9C%EC%8B%A0%20%EB%B2%84%EC%A0%84)](https://github.com/JiwonLee42/posture_alert/releases/latest) [![다운로드](https://img.shields.io/github/downloads/JiwonLee42/posture_alert/total?label=%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C)](https://github.com/JiwonLee42/posture_alert/releases) ![Windows](https://img.shields.io/badge/Windows-10%2B-0078D6)
+
 일하는 동안 자세를 알려 주는 Windows 앱 · 남은 수술비 **3,000만원 → 0원**을 목표로!
 
 ### [⬇️ 최신 버전 다운로드 (Windows)](https://github.com/JiwonLee42/posture_alert/releases/latest/download/posture-alert-windows.zip)
@@ -28,8 +30,6 @@
 1. 위의 **⬇️ 최신 버전 다운로드**를 눌러 zip을 받아요. (Releases 페이지의 **Assets → `posture-alert-windows.zip`**과 같은 파일이에요.)
 2. 압축을 풀고 **`posture-alert.exe`**를 더블클릭해요. 설치는 필요 없어요.
 3. 윈도우가 "PC를 보호했습니다"를 띄우면 **추가 정보 → 실행**을 눌러요. (서명이 없는 앱이라 처음에만 떠요.)
-
-> 💡 저장소가 비공개라서 GitHub에 로그인한 상태에서만 받을 수 있어요. 받을 권한이 없으면 저장소 주인에게 초대를 요청하세요.
 
 ## 사용법
 
