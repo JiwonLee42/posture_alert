@@ -95,8 +95,11 @@ class App:
         else:
             card = GuideCard(msg, ex, kind.value, self.assets, receipt=self.receipt(),
                              can_defer_stand=(kind is Kind.STAND and not alt))
-            card.want_alternative.connect(lambda: QTimer.singleShot(0, lambda: self.show(kind, alt=True)))
-        card.answered.connect(lambda r: self.on_answer(kind, ex.id, r))
+        # POST: 알림을 띄우는 순간 기록 생성 (result='shown', completed=0)
+        event_id = self.repo.create_event(kind.value, ex.id)
+        if kind is not Kind.EYE:
+            card.want_alternative.connect(lambda: self._switch_to_alt(event_id, kind))
+        card.answered.connect(lambda r: self.on_answer(event_id, kind, r))
         self._seq += 1
         seq = self._seq
         card.destroyed.connect(lambda *_: self._clear(seq))
@@ -125,8 +128,13 @@ class App:
         if seq == self._seq:
             self.card = None
 
-    def on_answer(self, kind: Kind, exercise_id: str, result: str):
-        self.repo.record(kind.value, exercise_id, result)
+    def _switch_to_alt(self, event_id: int, kind: Kind):
+        self.repo.answer(event_id, "switched")
+        QTimer.singleShot(0, lambda: self.show(kind, alt=True))
+
+    def on_answer(self, event_id: int, kind: Kind, result: str):
+        # PATCH: 같은 행을 업데이트 (done이면 completed=1, completed_at 기록)
+        self.repo.answer(event_id, result)
         if result == "done":
             self.ignored_streak = 0
             self._close_ghosts()
@@ -164,6 +172,7 @@ def save_shot(app: "App", out: str) -> None:
 
 def main() -> None:
     qapp = QApplication(sys.argv)
+    qapp.setApplicationName("posture-alert")  # DB 폴더 이름 고정
     qapp.setQuitOnLastWindowClosed(False)
     load_fonts(assets_dir())
     qapp.setStyleSheet(STYLESHEET)
@@ -185,6 +194,8 @@ def main() -> None:
             app.show_receipt()
         else:
             app.show(Kind(target))
+            if "--complete" in args:  # 완료 체크 화면 미리보기
+                app.card._complete()
     if "--shot" in args:
         out = args[args.index("--shot") + 1]
         QTimer.singleShot(300, lambda: (save_shot(app, out), qapp.quit()))
