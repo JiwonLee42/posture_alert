@@ -18,14 +18,14 @@ from PySide6.QtCore import QLockFile, QPoint, QStandardPaths, QTimer
 from PySide6.QtGui import QColor, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
-from .engine.billing import build_receipt, remaining
+from .engine.billing import build_receipt, remaining, won
 from .engine.content import APP_NAME, APP_TAGLINE, ASSETS, load_exercises, pick
 from .engine.stages import STAGES, Stage, StageCycle
 from .engine.uptime import UptimeCounter
 from .engine.scheduler import Kind, Scheduler
 from .platform import get_monitor
 from .storage.repo import Repo
-from .ui.popup import CHARACTERS, GhostError, GuideCard, LightToast, Onboarding, MiniWidget, ReceiptWindow
+from .ui.popup import CHARACTERS, GhostError, GuideCard, LightToast, Onboarding, MiniWidget, PetWidget, ReceiptWindow
 from .ui.retro import ERROR_ICON, ERROR_PAL, STYLESHEET, load_fonts, retro_font, sprite
 
 
@@ -66,7 +66,8 @@ class App:
         self.card = None
         self.ghosts: list[GhostError] = []
         self.receipt_win = None
-        self.mini = None
+        self.mini = None   # 캐릭터를 눌렀을 때 펼쳐지는 숫자 창
+        self.pet = None    # 오른쪽 아래 캐릭터
         self.ignored_streak = 0   # 연속으로 무시한 횟수 → 에러창이 그만큼 쌓인다
         self._seq = 0
         # 캐릭터: POSTURE_CHARACTER=f|m 이 있으면 그걸, 아니면 처음 실행 때 고른 값
@@ -122,39 +123,70 @@ class App:
             self.save_uptime()
         self.update_mini()
 
-    # --- 미니 리마인더 창 (화면 오른쪽 아래, 옮길 수 있음) ---
+    # --- 오른쪽 아래 캐릭터 + 누르면 펼쳐지는 숫자 창 ---
     def show_mini(self):
+        """캐릭터 보이기 (트레이 메뉴 / 시작할 때)."""
         if not self.started:
             return
-        if self.mini is None:
-            self.mini = self._retain(MiniWidget())
-            self.mini.moved_to.connect(lambda x, y: self.repo.set_setting("mini_pos", f"{x},{y}"))
-            self.mini.hidden_by_user.connect(lambda: self.repo.set_setting("mini_hidden", "1"))
-            self.mini.destroyed.connect(lambda *_: setattr(self, "mini", None))
+        if self.pet is None:
+            self.pet = self._retain(PetWidget(self.assets, self.character))
+            self.pet.clicked.connect(self.toggle_panel)
+            self.pet.moved.connect(self._place_panel)
+            self.pet.moved_to.connect(lambda x, y: self.repo.set_setting("mini_pos", f"{x},{y}"))
+            self.pet.destroyed.connect(lambda *_: setattr(self, "pet", None))
         self.repo.set_setting("mini_hidden", "0")
         self.update_mini()
         saved = self.repo.get_setting("mini_pos")
-        if saved:
-            x, y = (int(v) for v in saved.split(","))
-            pos = self.mini.clamp_pos(x, y)
-        else:
-            pos = self.mini.bottom_right()
-        self.mini.show_at(pos)
+        pos = self.pet.clamp_pos(*(int(v) for v in saved.split(","))) if saved else self.pet.bottom_right()
+        self.pet.move(pos)
+        self.pet.show()
 
     def toggle_mini(self):
-        if self.mini is not None and self.mini.isVisible():
-            self.mini.hide()
+        """트레이: 캐릭터 보이기/숨기기."""
+        if self.pet is not None and self.pet.isVisible():
+            self.pet.hide()
+            if self.mini is not None:
+                self.mini.hide()
             self.repo.set_setting("mini_hidden", "1")
         else:
             self.show_mini()
 
-    def update_mini(self):
-        if self.mini is None or not self.started:
+    def toggle_panel(self):
+        """캐릭터를 누르면 숫자 창을 펼치고, 다시 누르면 접는다."""
+        if self.mini is not None and self.mini.isVisible():
+            self.mini.hide()
             return
-        left = self.scheduler.next_in(datetime.now())
-        # 빠른 모드(speed>1)에서는 화면에 보이는 분도 같은 배율로
-        mins = None if left is None else math.ceil(left.total_seconds() * self.speed / 60)
-        self.mini.refresh(self.remaining(), mins, self.uptime.minutes)
+        if self.mini is None:
+            self.mini = self._retain(MiniWidget())
+            self.mini.hidden_by_user.connect(self.show_receipt)  # X 로 닫으면 오늘의 영수증
+            self.mini.destroyed.connect(lambda *_: setattr(self, "mini", None))
+        self.update_mini()
+        self.mini.fit()
+        self._place_panel()
+        self.mini.show()
+
+    def _place_panel(self):
+        """숫자 창을 캐릭터 위(자리가 없으면 아래)에 붙인다."""
+        if self.mini is None or self.pet is None:
+            return
+        geo = self.pet.screen().availableGeometry()
+        x = self.pet.x() + self.pet.width() - self.mini.width()
+        y = self.pet.y() - self.mini.height() - 6
+        if y < geo.top():
+            y = self.pet.y() + self.pet.height() + 6
+        self.mini.move(self.mini.clamp_pos(x, y))
+
+    def update_mini(self):
+        if not self.started:
+            return
+        alert = self.card is not None
+        if self.pet is not None:
+            self.pet.set_state(alert, won(self.remaining()))
+        if self.mini is not None:
+            left = self.scheduler.next_in(datetime.now())
+            # 빠른 모드(speed>1)에서는 화면에 보이는 분도 같은 배율로
+            mins = None if left is None else math.ceil(left.total_seconds() * self.speed / 60)
+            self.mini.refresh(self.remaining(), mins, self.uptime.minutes)
 
     def on_quit(self):
         self.shutdown()
@@ -171,8 +203,9 @@ class App:
         self._close_ghosts()
         if self.onboarding is not None:
             self.onboarding.close()
-        if self.mini is not None:
-            self.mini.close()
+        for w in (self.mini, self.pet):
+            if w is not None:
+                w.close()
         self.tray.hide()
         self.tray.setContextMenu(None)
 
@@ -274,6 +307,7 @@ class App:
         seq = self._seq
         card.destroyed.connect(lambda *_: self._clear(seq))
         self.card = self._retain(card)
+        self.update_mini()
 
         # 무시할수록 에러창이 왼쪽 위로 겹겹이 쌓인다 (레퍼런스의 에러 폭탄 느낌)
         # 위치는 popup.py 의 WINDOW_POSITION (기본: 화면 가운데)
@@ -298,6 +332,7 @@ class App:
         # 대체 동작으로 바꿀 때 이전 카드가 늦게 사라져도 새 카드를 지우지 않게
         if seq == self._seq:
             self.card = None
+            self.update_mini()
 
     def _switch_to_alt(self, event_id: int, stage: Stage):
         self.repo.answer(event_id, "switched")
@@ -332,7 +367,7 @@ def save_shot(app: "App", out: str) -> None:
     """떠 있는 창들(겹친 에러창 포함)을 한 장의 이미지로 저장 (데모·문서용)."""
     from PySide6.QtCore import QRect
     from PySide6.QtGui import QPainter, QPixmap
-    wins = [w for w in [*app.ghosts, app.card, app.receipt_win, app.onboarding, app.mini]
+    wins = [w for w in [*app.ghosts, app.card, app.receipt_win, app.onboarding, app.pet, app.mini]
             if w is not None and w.isVisible()]
     rect = QRect()
     for w in wins:

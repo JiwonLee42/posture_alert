@@ -390,7 +390,7 @@ class LightToast(_RetroWindow):
 
 class MiniWidget(_RetroWindow):
     """화면 구석에 계속 떠 있는 작은 리마인더 창: 남은 수술비 / 다음 알림까지 / 켜둔 시간.
-    × 는 닫는 게 아니라 숨기기 (트레이 아이콘을 누르면 다시 나옴). 제목줄을 끌어서 옮길 수 있다."""
+    X 를 누르면 접히면서 hidden_by_user 신호가 나간다 (앱이 오늘의 영수증을 띄움)."""
     moved_to = Signal(int, int)   # 옮긴 뒤 위치 (기억해 두기용)
     hidden_by_user = Signal()
 
@@ -431,6 +431,90 @@ class MiniWidget(_RetroWindow):
         geo = self.screen().availableGeometry()
         return QPoint(min(max(x, geo.left()), geo.right() - self.width()),
                       min(max(y, geo.top()), geo.bottom() - self.height()))
+
+
+class PetWidget(QWidget):
+    """화면 구석에 떠 있는 캐릭터. 평소엔 바른 자세, 알림이 떠 있으면 거북목 자세.
+    클릭하면 clicked 신호(숫자 창 열기), 끌면 옮겨진다. 배경은 투명."""
+    clicked = Signal()
+    moved = Signal()              # 옮기는 중 (숫자 창이 따라오게)
+    moved_to = Signal(int, int)   # 옮긴 뒤 위치 (기억해 두기용)
+    HEIGHT = 130
+
+    def __init__(self, assets: Path, character: str = "f"):
+        super().__init__(None, Qt.WindowType.FramelessWindowHint
+                         | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        self.setAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.assets, self.character, self.bad = assets, character, False
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(2)
+        self.bubble = QLabel()
+        self.bubble.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.bubble.setFont(retro_font(13, bold=True))
+        lay.addWidget(self.bubble, 0, Qt.AlignmentFlag.AlignHCenter)
+        self.img = QLabel()
+        self.img.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.addWidget(self.img)
+        self._press: QPoint | None = None
+        self._origin = QPoint()
+        self._dragging = False
+        self._save = QTimer(self)
+        self._save.setSingleShot(True)
+        self._save.timeout.connect(lambda: self.moved_to.emit(self.x(), self.y()))
+        self.set_state(False, "")
+
+    def _pixmap(self) -> QPixmap:
+        f = self.assets / "img" / "default" / f"{self.character}_{'bad' if self.bad else 'good'}.png"
+        if f.exists():
+            return QPixmap(str(f)).scaledToHeight(self.HEIGHT, Qt.TransformationMode.SmoothTransformation)
+        return sprite(BAD_POSE if self.bad else GOOD_POSE, POSE_PAL, 6)
+
+    def set_state(self, bad: bool, money_text: str):
+        """bad=True 면 거북목 자세 + 알림 말풍선, 아니면 바른 자세 + 남은 수술비."""
+        self.bad = bad
+        self.img.setPixmap(self._pixmap())
+        self.bubble.setText("자세 확인!" if bad else money_text)
+        color = "#c00000" if bad else "#000000"
+        self.bubble.setStyleSheet(
+            f"background:#c0c0c0; color:{color}; padding:2px 8px;"
+            "border:2px solid; border-color:#ffffff #000000 #000000 #ffffff;")
+        self.bubble.setVisible(bool(self.bubble.text()))
+        self.adjustSize()
+
+    def clamp_pos(self, x: int, y: int) -> QPoint:
+        geo = self.screen().availableGeometry()
+        return QPoint(min(max(x, geo.left()), geo.right() - self.width()),
+                      min(max(y, geo.top()), geo.bottom() - self.height()))
+
+    def bottom_right(self) -> QPoint:
+        self.adjustSize()
+        geo = self.screen().availableGeometry()
+        return QPoint(geo.right() - self.width() - 16, geo.bottom() - self.height() - 16)
+
+    def mousePressEvent(self, e):
+        self._press = e.globalPosition().toPoint()
+        self._origin = self.pos()
+        self._dragging = False
+
+    def mouseMoveEvent(self, e):
+        if self._press is None:
+            return
+        d = e.globalPosition().toPoint() - self._press
+        if self._dragging or d.manhattanLength() > 5:   # 살짝 흔들린 건 클릭으로 본다
+            self._dragging = True
+            self.move(self._origin + d)
+            self.moved.emit()
+            self._save.start(500)
+
+    def mouseReleaseEvent(self, e):
+        if self._press is not None and not self._dragging:
+            self.clicked.emit()
+        self._press = None
+        self._dragging = False
 
 
 class ReceiptWindow(_RetroWindow):
