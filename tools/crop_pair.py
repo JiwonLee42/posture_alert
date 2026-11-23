@@ -40,6 +40,24 @@ def erase_labels(im: "Image.Image", period: int) -> "Image.Image":
     return im
 
 
+def out_path(name: str, character: str | None, which: str) -> Path:
+    """동작 id 'default' 는 메인(기본) 그림 자리: img/default/{f|m}_{bad|good}.png"""
+    if name == "default":
+        return OUT / "default" / f"{character or 'f'}_{which}.png"
+    return OUT / f"{name}{'_' + character if character else ''}_{which}.png"
+
+
+def finish(im: "Image.Image", a) -> "Image.Image":
+    if a.height:
+        im = im.resize((round(im.width * a.height / im.height), a.height), Image.LANCZOS)
+    if a.transparent:
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from transparent import make_transparent
+        im = make_transparent(im)
+    return im
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("image")
@@ -54,6 +72,8 @@ def main() -> None:
                    help="빨강 (X)/초록 (O) 글자를 위쪽 배경 무늬로 덮어 지움")
     p.add_argument("--period", type=int, default=240, help="배경 체크무늬 반복 주기(px)")
     p.add_argument("--boxes", help="자를 상자 직접 지정: 'x0,y0,x1,y1;x0,y0,x1,y1' (✕칸;○칸)")
+    p.add_argument("--height", type=int, help="저장할 때 이 높이(px)로 줄임 (예: 440)")
+    p.add_argument("--transparent", action="store_true", help="체크무늬 배경을 투명으로 (tools/transparent.py)")
     a = p.parse_args()
 
     # 위치 인자가 하나뿐이면 (--rows 모드에서 캐릭터만 준 경우) 캐릭터로 취급
@@ -72,8 +92,8 @@ def main() -> None:
         out_dir = OUT
         suffix = f"_{a.character}" if a.character else ""
         for box, which in zip(boxes, ("bad", "good")):
-            out = out_dir / f"{names[0]}{suffix}_{which}.png"
-            im.crop(box).save(out, optimize=True)
+            out = out_path(names[0], a.character, which)
+            finish(im.crop(box), a).save(out, optimize=True)
             print("저장:", out.relative_to(OUT.parent.parent.parent.parent))
         return
     row_h = H / a.rows
@@ -86,8 +106,8 @@ def main() -> None:
             cw, ch = x1 - x0, y1 - y0
             box = (int(x0 + cw * a.side), int(y0 + ch * a.top),
                    int(x1 - cw * a.side), int(y1 - ch * a.bottom))
-            out = OUT / f"{name}{suffix}_{which}.png"
-            im.crop(box).save(out, optimize=True)
+            out = out_path(name, a.character, which)
+            finish(im.crop(box), a).save(out, optimize=True)
             print("저장:", out.relative_to(OUT.parent.parent.parent.parent))
 
 
