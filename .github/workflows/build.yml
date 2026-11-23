@@ -38,7 +38,7 @@ jobs:
       - name: Zip
         if: github.ref == 'refs/heads/main'
         shell: pwsh
-        run: Compress-Archive -Path dist/posture-alert -DestinationPath 척추수술3000-windows.zip
+        run: Compress-Archive -Path dist/posture-alert -DestinationPath posture-alert-windows.zip
 
       - name: Release
         if: github.ref == 'refs/heads/main'
@@ -46,6 +46,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
-          gh release create "v1.0.${{ github.run_number }}" 척추수술3000-windows.zip
+          gh release create "v1.0.${{ github.run_number }}" posture-alert-windows.zip
           --title "척추수술3000 v1.0.${{ github.run_number }}"
           --notes-file RELEASE_NOTES.md --generate-notes --target ${{ github.sha }}
