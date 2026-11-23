@@ -198,6 +198,7 @@ class App:
         if self.onboarding is not None:
             self.onboarding.close()  # _alive 가 붙잡고 있다가 destroyed 때 놓음
         self.onboarding = None
+        QTimer.singleShot(300, self.show_next)  # 시작하자마자 첫 알림 한 번, 그 뒤로는 30분마다
 
     def receipt(self):
         return build_receipt(self.repo.events_today())
