@@ -61,6 +61,37 @@ src/posture_alert/
 
 예전 DB는 앱을 켤 때 `completed`, `completed_at` 컬럼을 자동으로 추가합니다. DB 위치는 Windows 기준 `%APPDATA%\posture-alert\posture_alert.sqlite3`입니다.
 
+## 단계 사이클
+
+알림이 뜰 때마다 단계 **1 → 2 → … → 8 → 1** 순서로 돕니다 (기본 20분마다 한 단계, `POSTURE_EVERY=분`으로 조절).
+연속으로 90분 앉아 있으면 순서와 상관없이 8단계(일어나기)가 끼어듭니다. 이때 사이클 위치는 그대로예요.
+
+| 단계 | enum | 자세 |
+|---|---|---|
+| 1 | `EYE_FAR` | 먼 곳 보기 |
+| 2 | `CHIN_TUCK` | 턱 당기기 |
+| 3 | `SHOULDER_OPEN` | 어깨 펴기 |
+| 4 | `NECK_SIDE` | 목 옆 늘리기 |
+| 5 | `SCAPULA_SQUEEZE` | 날개뼈 모으기 |
+| 6 | `SEAT_BACK` | 의자 위 허리 세우기 |
+| 7 | `ANKLE_PUMP` | 발목 펌프 |
+| 8 | `STAND_WATER` | 일어나서 물 마시기 |
+
+단계 정의(자세·멘트)는 코드의 `engine/stages.py`가 기준이고, 앱을 켤 때 `stages` 테이블로 복사됩니다.
+
+### 테이블
+
+| 테이블 | 한 행 | 주요 컬럼 |
+|---|---|---|
+| `stages` | 단계 1개 | `id`(enum 값), `code`, `exercise_id`(자세), `title`·`body`(멘트) |
+| `cycles` | 사이클 1바퀴 | `position`(마지막으로 보여준 단계), **`stage_1` ~ `stage_8`** (했으면 1, 0/1만 허용) |
+| `events` | 알림 1건 | `stage`, `cycle_id`, `result`, `completed`, `completed_at` |
+| `sessions` | 앱 실행 1번 | `started_at`, `last_seen_at`, **`uptime_minutes`** (켠 뒤로 지난 분) |
+
+- "네, 맞췄어요" → `events` 행 PATCH + `cycles.stage_N = 1` PATCH
+- 앱을 다시 켜면 마지막 `cycles.position` 다음 단계부터 이어서 돕니다.
+- 켜둔 시간은 메모리 카운터(`engine/uptime.py`)가 들고 있다가, **분이 바뀔 때만** `sessions` 행을 UPDATE합니다.
+
 ## 폰트
 
 픽셀 폰트 **둥근모꼴+ Fixedsys**(`assets/fonts/DungGeunMo.ttf`, SIL OFL 1.1)를 앱에 포함합니다. 출처와 라이선스는 `assets/fonts/LICENSE-DungGeunMo.txt`를 참고하세요.
