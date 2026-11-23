@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# PyInstaller / 빌드 결과물
+build/
+dist/
+*.spec
+
+# Inno Setup 출력
+installer/Output/
+
+# 로컬 데이터 / 환경
+*.sqlite3
+*.db
+.env
+
+# OS / 에디터
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
