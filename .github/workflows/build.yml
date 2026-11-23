@@ -1,0 +1,31 @@
+name: build-windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Test
+        run: uv run pytest -q
+
+      - name: Build exe (PyInstaller)
+        run: >
+          uv run pyinstaller --noconfirm --name posture-alert --windowed
+          --add-data "src/posture_alert/assets;assets"
+          src/posture_alert/__main__.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: posture-alert-windows
+          path: dist/posture-alert
