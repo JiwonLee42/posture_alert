@@ -47,4 +47,4 @@ jobs:
         run: >
           gh release create "v1.0.${{ github.run_number }}" 척추수술3000-windows.zip
           --title "척추수술3000 v1.0.${{ github.run_number }}"
-          --generate-notes --target ${{ github.sha }}
+          --notes-file RELEASE_NOTES.md --generate-notes --target ${{ github.sha }}
