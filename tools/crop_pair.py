@@ -13,6 +13,33 @@ from PIL import Image
 OUT = Path(__file__).resolve().parent.parent / "src" / "posture_alert" / "assets" / "img"
 
 
+def erase_labels(im: "Image.Image", period: int) -> "Image.Image":
+    """빨강/초록 글자 영역을 찾아, 같은 x 에서 period 만큼 위의 배경으로 덮는다."""
+    im = im.copy()
+    px = im.load()
+    W, H = im.size
+
+    def is_label(r, g, b):
+        return (r > 170 and g < 100 and b < 100) or (g > 110 and r < 100 and b < 100)
+
+    # 글자는 각 칸의 왼쪽 위에 있다. 얼굴(볼 터치 빨강)까지 잡지 않게 그 구역만 찾는다
+    for x0 in (0, W // 2):
+        x1 = x0 + W // 5
+        hits = [(x, y) for y in range(0, int(H * 0.45), 2) for x in range(x0, x1, 2)
+                if is_label(*px[x, y])]
+        if not hits:
+            continue
+        xs, ys = [h[0] for h in hits], [h[1] for h in hits]
+        pad = 14
+        box = (max(min(xs) - pad, 0), max(min(ys) - pad, 0), min(max(xs) + pad, W), max(ys) + pad)
+        src_y = box[1] - period
+        if src_y < 0:
+            continue
+        patch = im.crop((box[0], src_y, box[2], src_y + box[3] - box[1]))
+        im.paste(patch, box[:2])
+    return im
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("image")
@@ -23,6 +50,10 @@ def main() -> None:
     p.add_argument("--top", type=float, default=0.14, help="칸 위쪽에서 잘라낼 비율 ((X)/(O) 글자)")
     p.add_argument("--bottom", type=float, default=0.02, help="칸 아래쪽에서 잘라낼 비율")
     p.add_argument("--side", type=float, default=0.03, help="칸 양옆에서 잘라낼 비율")
+    p.add_argument("--erase-labels", action="store_true",
+                   help="빨강 (X)/초록 (O) 글자를 위쪽 배경 무늬로 덮어 지움")
+    p.add_argument("--period", type=int, default=240, help="배경 체크무늬 반복 주기(px)")
+    p.add_argument("--boxes", help="자를 상자 직접 지정: 'x0,y0,x1,y1;x0,y0,x1,y1' (✕칸;○칸)")
     a = p.parse_args()
 
     # 위치 인자가 하나뿐이면 (--rows 모드에서 캐릭터만 준 경우) 캐릭터로 취급
@@ -33,7 +64,18 @@ def main() -> None:
         p.error("동작 id 개수가 줄 수와 맞지 않아요")
 
     im = Image.open(a.image).convert("RGB")
+    if a.erase_labels:
+        im = erase_labels(im, a.period)
     W, H = im.size
+    if a.boxes:
+        boxes = [tuple(int(v) for v in b.split(",")) for b in a.boxes.split(";")]
+        out_dir = OUT
+        suffix = f"_{a.character}" if a.character else ""
+        for box, which in zip(boxes, ("bad", "good")):
+            out = out_dir / f"{names[0]}{suffix}_{which}.png"
+            im.crop(box).save(out, optimize=True)
+            print("저장:", out.relative_to(OUT.parent.parent.parent.parent))
+        return
     row_h = H / a.rows
     suffix = f"_{a.character}" if a.character else ""
     OUT.mkdir(parents=True, exist_ok=True)
