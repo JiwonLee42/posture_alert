@@ -19,7 +19,7 @@ from .retro import (BAD_POSE, CHECK_ICON, CHECK_PAL, CHECKBOX_OFF, CHECKBOX_ON,
                     CHECKBOX_PAL, DARK, ERROR_ICON, ERROR_PAL, GOOD_POSE, NAVY,
                     POSE_PAL, WARNING, WARNING_PAL, retro_font, sprite)
 
-IMG_SIZE = 128
+IMG_W, IMG_H = 176, 164  # 그림 칸 크기 (기본 캐릭터 그림 비율 400:372)
 EXE = f"{APP_NAME}.exe"
 ERROR_CODES = {
     "posture": "TURTLE_NECK_OVERFLOW",
@@ -149,12 +149,20 @@ def _button(text: str, primary: bool = False) -> QPushButton:
     return b
 
 
-def pose_image(assets: Path, exercise_id: str, which: str) -> QPixmap:
-    """assets/img/{id}_{good|bad}.png 가 있으면 쓰고, 없으면 임시 픽셀 그림."""
-    f = assets / "img" / f"{exercise_id}_{which}.png"
-    if f.exists():
-        return QPixmap(str(f)).scaled(IMG_SIZE, IMG_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
-                                      Qt.TransformationMode.FastTransformation)
+CHARACTERS = ("f", "m")  # assets/img/default/{f|m}_{bad|good}.png
+
+
+def pose_image(assets: Path, exercise_id: str, which: str, character: str = "f") -> QPixmap:
+    """그림 고르는 순서:
+    1) assets/img/{동작id}_{good|bad}.png   (동작별 전용 그림)
+    2) assets/img/default/{f|m}_{good|bad}.png (기본 캐릭터: 거북목 ✕ / 바른 자세 ○)
+    3) 임시 픽셀 막대 인형
+    """
+    for f in (assets / "img" / f"{exercise_id}_{which}.png",
+              assets / "img" / "default" / f"{character}_{which}.png"):
+        if f.exists():
+            return QPixmap(str(f)).scaled(IMG_W, IMG_H, Qt.AspectRatioMode.KeepAspectRatio,
+                                          Qt.TransformationMode.SmoothTransformation)
     return sprite(GOOD_POSE if which == "good" else BAD_POSE, POSE_PAL, 9)
 
 
@@ -165,11 +173,11 @@ def image_panel(pm: QPixmap, caption: str) -> QWidget:
     v.setSpacing(4)
     frame = QFrame()
     frame.setObjectName("sunken")
-    frame.setFixedSize(IMG_SIZE + 8, IMG_SIZE + 8)
+    frame.setFixedSize(IMG_W + 8, IMG_H + 8)
     img = QLabel(frame)
     img.setPixmap(pm)
     img.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    img.setGeometry(4, 4, IMG_SIZE, IMG_SIZE)
+    img.setGeometry(4, 4, IMG_W, IMG_H)
     cap = _label(caption, 12, bold=True)
     cap.setAlignment(Qt.AlignmentFlag.AlignCenter)
     v.addWidget(frame)
@@ -183,10 +191,11 @@ class GuideCard(_RetroWindow):
     want_alternative = Signal()   # 일어나기 알림에서 "지금 못 일어나요"
 
     def __init__(self, msg: Message, ex: Exercise, kind: str, assets: Path,
-                 receipt: Receipt | None = None, can_defer_stand: bool = False):
+                 receipt: Receipt | None = None, can_defer_stand: bool = False,
+                 character: str = "f"):
         super().__init__(f"{EXE} - 응용 프로그램 오류")
         self.ex = ex
-        self.setFixedWidth(420)
+        self.setFixedWidth(440)
         self.title_bar.closed.connect(lambda: self._answer("skip"))
 
         price = price_of(kind)
@@ -197,9 +206,9 @@ class GuideCard(_RetroWindow):
 
         imgs = QHBoxLayout()
         imgs.addStretch()
-        imgs.addWidget(image_panel(pose_image(assets, ex.id, "bad"), "✕ 지금"))
+        imgs.addWidget(image_panel(pose_image(assets, ex.id, "bad", character), "✕ 지금"))
         imgs.addSpacing(12)
-        imgs.addWidget(image_panel(pose_image(assets, ex.id, "good"), "○ 이렇게"))
+        imgs.addWidget(image_panel(pose_image(assets, ex.id, "good", character), "○ 이렇게"))
         imgs.addStretch()
         self.body.addLayout(imgs)
 

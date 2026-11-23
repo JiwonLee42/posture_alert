@@ -8,6 +8,8 @@ ChatGPT(이미지 생성), Gemini, Midjourney 어디서든 쓸 수 있게 영어
 
 ## 1. 앱에 넣는 방법
 
+> **현재 기본 그림**: `assets/img/default/{f|m}_{bad|good}.png` — "기억하자 척추수술 3000만원" 그림에서 잘라낸 여성(f)·남성(m) 캐릭터의 거북목(✕)/바른 자세(○). 동작별 전용 그림이 없으면 이 그림이 나오고, 알림마다 두 캐릭터가 번갈아 나옵니다. (`POSTURE_CHARACTER=f` 또는 `m`으로 고정 가능)
+
 - 파일 위치: `src/posture_alert/assets/img/`
 - 파일 이름: `{동작 id}_bad.png` (✕ 지금), `{동작 id}_good.png` (○ 이렇게)
 - 파일이 있으면 앱이 자동으로 그 그림을 쓰고, 없으면 지금의 임시 막대 인형을 보여줘요.

@@ -21,7 +21,7 @@ from .engine.content import (APP_NAME, APP_SUBTITLE, ASSETS, load_exercises,
 from .engine.scheduler import Kind, Scheduler
 from .platform import get_monitor
 from .storage.repo import Repo
-from .ui.popup import GhostError, GuideCard, LightToast, ReceiptWindow
+from .ui.popup import CHARACTERS, GhostError, GuideCard, LightToast, ReceiptWindow
 from .ui.retro import ERROR_ICON, ERROR_PAL, STYLESHEET, load_fonts, sprite
 
 
@@ -55,6 +55,9 @@ class App:
         self.receipt_win = None
         self.ignored_streak = 0   # 연속으로 무시한 횟수 → 에러창이 그만큼 쌓인다
         self._seq = 0
+        # 기본 캐릭터: POSTURE_CHARACTER=f|m 으로 고정, 없으면 알림마다 번갈아
+        self.character_pref = os.environ.get("POSTURE_CHARACTER")
+        self._char_i = 0
 
         self.tray = QSystemTrayIcon(QIcon(sprite(ERROR_ICON, ERROR_PAL, 2)))
         self.tray.setToolTip(f"{APP_NAME} - {APP_SUBTITLE}")
@@ -81,6 +84,13 @@ class App:
         if kind and self.card is None:  # 이미 떠 있으면 겹쳐 띄우지 않음
             self.show(kind)
 
+    @property
+    def character(self) -> str:
+        if self.character_pref in CHARACTERS:
+            return self.character_pref
+        self._char_i += 1
+        return CHARACTERS[self._char_i % len(CHARACTERS)]
+
     def receipt(self):
         return build_receipt(self.repo.events_today())
 
@@ -94,7 +104,8 @@ class App:
             card = LightToast(msg, ex)
         else:
             card = GuideCard(msg, ex, kind.value, self.assets, receipt=self.receipt(),
-                             can_defer_stand=(kind is Kind.STAND and not alt))
+                             can_defer_stand=(kind is Kind.STAND and not alt),
+                             character=self.character)
         # POST: 알림을 띄우는 순간 기록 생성 (result='shown', completed=0)
         event_id = self.repo.create_event(kind.value, ex.id)
         if kind is not Kind.EYE:
