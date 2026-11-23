@@ -1,4 +1,4 @@
-name: build-windows
+name: build
 
 on:
   push:
@@ -9,43 +9,68 @@ permissions:
   contents: write   # Release 만들기에 필요
 
 jobs:
-  build:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: astral-sh/setup-uv@v6
-
       - name: Install dependencies
         run: uv sync
-
       - name: Test
         run: uv run pytest -q
-
       - name: Build exe (PyInstaller)
         run: >
           uv run pyinstaller --noconfirm --name posture-alert --windowed
           --icon src/posture_alert/assets/icon.ico
           --add-data "src/posture_alert/assets;assets"
           src/posture_alert/__main__.py
-
+      - name: Zip
+        shell: pwsh
+        run: Compress-Archive -Path dist/posture-alert -DestinationPath posture-alert-windows.zip
       - uses: actions/upload-artifact@v4
         with:
           name: posture-alert-windows
-          path: dist/posture-alert
+          path: posture-alert-windows.zip
 
-      # main에 push할 때마다 v1.0.<실행번호> 태그를 붙여 Release 로 올린다
-      - name: Zip
-        if: github.ref == 'refs/heads/main'
-        shell: pwsh
-        run: Compress-Archive -Path dist/posture-alert -DestinationPath posture-alert-windows.zip
+  macos:
+    runs-on: macos-latest   # Apple Silicon (M1~)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install dependencies
+        run: uv sync
+      - name: Test
+        run: QT_QPA_PLATFORM=offscreen uv run pytest -q
+      - name: Build app (PyInstaller)
+        run: >
+          uv run pyinstaller --noconfirm --name posture-alert --windowed
+          --icon src/posture_alert/assets/icon.icns
+          --osx-bundle-identifier com.jiwonlee42.posture-alert
+          --add-data "src/posture_alert/assets:assets"
+          src/posture_alert/__main__.py
+      - name: Zip (.app 은 ditto 로 묶어야 실행 권한이 유지됨)
+        run: ditto -c -k --keepParent dist/posture-alert.app posture-alert-macos.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: posture-alert-macos
+          path: posture-alert-macos.zip
 
+  release:
+    # main 에 push 할 때마다 v1.0.<실행번호> 태그로 Windows·Mac 파일을 한 Release 에 올린다
+    needs: [windows, macos]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
       - name: Release
-        if: github.ref == 'refs/heads/main'
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
-          gh release create "v1.0.${{ github.run_number }}" posture-alert-windows.zip
+          gh release create "v1.0.${{ github.run_number }}"
+          dist/posture-alert-windows.zip dist/posture-alert-macos.zip
           --title "척추수술3000 v1.0.${{ github.run_number }}"
           --notes-file RELEASE_NOTES.md --generate-notes --target ${{ github.sha }}

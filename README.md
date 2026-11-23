@@ -4,11 +4,11 @@
 
 **기억하자, 척추수술 3000만원**
 
-[![최신 버전](https://img.shields.io/github/v/release/JiwonLee42/posture_alert?label=%EC%B5%9C%EC%8B%A0%20%EB%B2%84%EC%A0%84)](https://github.com/JiwonLee42/posture_alert/releases/latest) [![다운로드](https://img.shields.io/github/downloads/JiwonLee42/posture_alert/total?label=%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C)](https://github.com/JiwonLee42/posture_alert/releases) ![Windows](https://img.shields.io/badge/Windows-10%2B-0078D6)
+[![최신 버전](https://img.shields.io/github/v/release/JiwonLee42/posture_alert?label=%EC%B5%9C%EC%8B%A0%20%EB%B2%84%EC%A0%84)](https://github.com/JiwonLee42/posture_alert/releases/latest) [![다운로드](https://img.shields.io/github/downloads/JiwonLee42/posture_alert/total?label=%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C)](https://github.com/JiwonLee42/posture_alert/releases) ![Windows](https://img.shields.io/badge/Windows-10%2B-0078D6) ![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple)
 
-일하는 동안 자세를 알려 주는 Windows 앱 · 남은 수술비 **3,000만원 → 0원**을 목표로!
+일하는 동안 자세를 알려 주는 Windows · Mac 앱 · 남은 수술비 **3,000만원 → 0원**을 목표로!
 
-### [⬇️ 최신 버전 다운로드 (Windows)](https://github.com/JiwonLee42/posture_alert/releases/latest/download/posture-alert-windows.zip)
+### [⬇️ Windows 다운로드](https://github.com/JiwonLee42/posture_alert/releases/latest/download/posture-alert-windows.zip) · [⬇️ Mac 다운로드](https://github.com/JiwonLee42/posture_alert/releases/latest/download/posture-alert-macos.zip)
 
 [새로운 점](https://github.com/JiwonLee42/posture_alert/releases/latest) · [전체 버전](https://github.com/JiwonLee42/posture_alert/releases) · [사용법](#사용법) · [자주 묻는 질문](#자주-묻는-질문)
 
@@ -27,9 +27,24 @@
 
 ## 다운로드
 
-1. 위의 **⬇️ 최신 버전 다운로드**를 눌러 zip을 받아요. (Releases 페이지의 **Assets → `posture-alert-windows.zip`**과 같은 파일이에요.)
-2. 압축을 풀고 **`posture-alert.exe`**를 더블클릭해요. 설치는 필요 없어요.
-3. 윈도우가 "PC를 보호했습니다"를 띄우면 **추가 정보 → 실행**을 눌러요. (서명이 없는 앱이라 처음에만 떠요.)
+위의 **Windows / Mac 다운로드** 버튼을 누르면 최신 버전 zip이 바로 받아져요. (Releases 페이지의 Assets와 같은 파일이에요.)
+
+### Windows
+
+1. `posture-alert-windows.zip`을 풀고 **`posture-alert.exe`**를 더블클릭해요. 설치는 필요 없어요.
+2. "PC를 보호했습니다"가 뜨면 **추가 정보 → 실행**을 눌러요. (서명이 없는 앱이라 처음에만 떠요.)
+
+### Mac (Apple Silicon: M1 이상)
+
+1. `posture-alert-macos.zip`을 풀면 **`posture-alert.app`**이 나와요. 응용 프로그램 폴더로 옮기면 편해요.
+2. 처음에는 **우클릭 → 열기 → 열기**로 실행해요. (서명이 없는 앱이라 더블클릭하면 막혀요.)
+3. 그래도 "손상되었기 때문에 열 수 없습니다"가 뜨면 터미널에서 한 번만 실행해요.
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/posture-alert.app
+   ```
+4. 화면 오른쪽 위 메뉴바에 아이콘이 생겨요. 우클릭(또는 클릭) 메뉴에서 종료할 수 있어요.
+
+> Mac은 키보드·마우스 입력 시간으로 자리 비움을 알아내요. 전체 화면·회의 중 감지는 Windows에서만 돼요.
 
 ## 사용법
 

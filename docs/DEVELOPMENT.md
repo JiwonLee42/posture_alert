@@ -29,7 +29,7 @@ Mac에서는 자리 비움·전체 화면·회의 감지가 가짜 구현(`platf
 
 ## 빌드와 배포
 
-`main`에 push하면 GitHub Actions(`build-windows`)가 테스트 → exe 빌드 → **Release**(`v1.0.<실행번호>`)까지 자동으로 만듭니다.
+`main`에 push하면 GitHub Actions(`build`)가 **windows**(exe)·**macos**(.app, Apple Silicon) 잡을 각각 테스트·빌드하고, 둘 다 성공하면 **release** 잡이 `v1.0.<실행번호>` Release에 두 zip을 같이 올립니다. 한쪽이라도 실패하면 Release가 안 만들어집니다.
 Release 본문 맨 위에는 [RELEASE_NOTES.md](../RELEASE_NOTES.md)가 들어가니, **push 전에 이번 개선사항으로 고쳐 두세요.**
 Release 없이 빌드 결과만 받으려면 Actions 탭 → 실행 → Artifacts의 `posture-alert-windows`.
 
