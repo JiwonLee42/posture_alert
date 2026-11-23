@@ -322,7 +322,6 @@ class GuideCard(_RetroWindow):
         self.question.setText("0원이 될 때까지 계속해요" if left else "🎉 수술비 0원 달성!")
         for b in self.buttons:
             b.setEnabled(False)
-        self.title_bar.closed.disconnect()
         self.title_bar.closed.connect(self.close)
         self.later(1600, self.close)
 
@@ -387,6 +386,51 @@ class LightToast(_RetroWindow):
         if self.isVisible():
             self.answered.emit(result)
             self.close()
+
+
+class MiniWidget(_RetroWindow):
+    """화면 구석에 계속 떠 있는 작은 리마인더 창: 남은 수술비 / 다음 알림까지 / 켜둔 시간.
+    × 는 닫는 게 아니라 숨기기 (트레이 아이콘을 누르면 다시 나옴). 제목줄을 끌어서 옮길 수 있다."""
+    moved_to = Signal(int, int)   # 옮긴 뒤 위치 (기억해 두기용)
+    hidden_by_user = Signal()
+
+    def __init__(self):
+        super().__init__(APP_NAME)
+        self.setAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow)  # 맥: 다른 앱 쓸 때도 보이게
+        self.setFixedWidth(230)
+        self.title_bar.closed.connect(self._hide_clicked)
+        self.body.setContentsMargins(10, 8, 10, 8)
+        self.body.setSpacing(4)
+        self.money = _label("", 16, bold=True)
+        self.next = _label("", 13)
+        self.up = _label("", 13)
+        for w in (self.money, self.next, self.up):
+            self.body.addWidget(w)
+        self._save = QTimer(self)
+        self._save.setSingleShot(True)
+        self._save.timeout.connect(lambda: self.moved_to.emit(self.x(), self.y()))
+
+    def _hide_clicked(self):
+        self.hide()
+        self.hidden_by_user.emit()
+
+    def moveEvent(self, e):
+        super().moveEvent(e)
+        if self.isVisible():
+            self._save.start(500)  # 옮기는 중에는 저장하지 않고, 멈춘 뒤에 한 번
+
+    def refresh(self, remaining: int, next_minutes: int | None, uptime_minutes: int):
+        self.money.setText(f"남은 수술비 {won(remaining)}")
+        self.next.setText("다음 알림 -" if next_minutes is None else
+                          "다음 알림 곧" if next_minutes <= 0 else f"다음 알림 {next_minutes}분 뒤")
+        h, m = divmod(uptime_minutes, 60)
+        self.up.setText("켜둔 지 " + (f"{h}시간 {m}분" if h else f"{m}분"))
+
+    def clamp_pos(self, x: int, y: int) -> QPoint:
+        """저장된 위치가 화면 밖이면(모니터를 바꿨을 때 등) 화면 안으로 되돌림."""
+        geo = self.screen().availableGeometry()
+        return QPoint(min(max(x, geo.left()), geo.right() - self.width()),
+                      min(max(y, geo.top()), geo.bottom() - self.height()))
 
 
 class ReceiptWindow(_RetroWindow):

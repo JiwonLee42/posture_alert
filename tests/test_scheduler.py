@@ -121,3 +121,14 @@ def test_초단위_테스트_간격():
     s.tick(Snapshot(t, 0))
     fired = [sec for sec in range(1, 10) if s.tick(Snapshot(t + timedelta(seconds=sec), 0))]
     assert fired == [3, 6, 9]
+
+
+def test_다음_알림까지_남은_시간():
+    from datetime import datetime, timedelta
+    from posture_alert.engine.scheduler import Kind, Scheduler
+    s = Scheduler.for_cycle(30)
+    t0 = datetime(2026, 1, 1, 9, 0)
+    assert s.next_in(t0) is None                      # 아직 앉기 시작 전
+    s.sitting_since = t0
+    assert s.next_in(t0 + timedelta(minutes=10)) == timedelta(minutes=20)
+    assert s.next_in(t0 + timedelta(minutes=45)) == timedelta(0)
