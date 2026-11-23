@@ -8,14 +8,16 @@
     POSTURE_EVERY=20 uv run posture-alert    # 단계 하나당 간격(분), 기본 30
     uv run posture-alert --shot out.png --demo posture   # 카드 스크린샷 저장 후 종료
 """
+import logging
 import math
 import os
 import sys
+from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from PySide6.QtCore import QLockFile, QPoint, QStandardPaths, QTimer
-from PySide6.QtGui import QColor, QIcon
+from PySide6.QtCore import QLockFile, QPoint, QStandardPaths, QTimer, QUrl
+from PySide6.QtGui import QColor, QDesktopServices, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from .engine.billing import build_receipt, remaining, won
@@ -39,6 +41,26 @@ def data_path() -> Path:
     d = Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation))
     d.mkdir(parents=True, exist_ok=True)
     return d / "posture_alert.sqlite3"
+
+
+log = logging.getLogger("posture")
+
+
+def log_path() -> Path:
+    return data_path().parent / "posture_alert.log"
+
+
+def setup_logging() -> None:
+    """파일 로그: 알림이 왜 떴는지/안 떴는지 나중에 볼 수 있게 남긴다 (1MB × 3개까지 돌려 씀)."""
+    handler = RotatingFileHandler(log_path(), maxBytes=1_000_000, backupCount=2, encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    log.setLevel(logging.INFO)
+    log.addHandler(handler)
+
+    def excepthook(et, ev, tb):   # 잡히지 않은 오류도 로그에 남긴다
+        log.error("처리되지 않은 오류", exc_info=(et, ev, tb))
+        sys.__excepthook__(et, ev, tb)
+    sys.excepthook = excepthook
 
 
 IGNORED = {"skip", "snooze", "timeout"}
@@ -92,6 +114,7 @@ class App:
         self.menu = menu = QMenu()
         menu.addAction("미니 창 보이기/숨기기", self.toggle_mini)
         menu.addAction("오늘 견적서 보기", self.show_receipt)
+        menu.addAction("로그 폴더 열기", lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(log_path().parent))))
         menu.addSeparator()
         menu.addAction("다음 단계 바로 하기", self.show_next)
         menu.addAction("일어나기", lambda: self.show_stage(Stage.STAND_WATER, interrupt=True))
@@ -123,6 +146,11 @@ class App:
     def on_uptime(self):
         if self.uptime.poll() is not None:
             self.save_uptime()
+            if self.uptime.minutes % 10 == 0:   # 10분마다 상태를 한 줄 남김
+                left = self.scheduler.next_in(datetime.now())
+                log.info("상태: 켜둔 %d분, 다음 알림까지 %s, 단계 위치 %s, 알림 %s",
+                         self.uptime.minutes, left, self.cycle.position,
+                         "떠 있음" if self.card is not None else "없음")
         self.update_mini()
 
     # --- 오른쪽 아래 캐릭터 + 누르면 펼쳐지는 숫자 창 ---
@@ -210,6 +238,7 @@ class App:
             self.mini.refresh(self.remaining(), mins, self.uptime.minutes)
 
     def on_quit(self):
+        log.info("종료 (켜둔 시간 %d분)", self.uptime.minutes)
         self.shutdown()
         if RESET_ON_EXIT:
             self.repo.reset()
@@ -252,7 +281,9 @@ class App:
         """알림 시각이 됐을 때. 앞 알림에 아직 답을 안 했으면 '무시'로 치고 다음 단계로 넘어간다.
         (알림 창은 누를 때까지 떠 있으므로, 이렇게 안 하면 새 알림이 삼켜져 같은 단계에서 멈춘다)"""
         if self.quitting:
+            log.info("알림 시각이지만 종료 중이라 건너뜀 (%s)", kind.value)
             return
+        log.info("알림 시각: %s (앞 알림 %s)", kind.value, "아직 떠 있음 → 무시 처리" if self.card is not None else "없음")
         if self.card is not None:
             self.card._answer("timeout")   # 수술비 +50만원, 에러창이 쌓임
         if kind is Kind.STAND:
@@ -301,6 +332,7 @@ class App:
         self.onboarding.show()
 
     def _on_started(self, character: str):
+        log.info("시작하기: 캐릭터 %s", character)
         self.repo.set_setting("character", character)
         self.repo.set_setting("started_at", datetime.now().isoformat(timespec="seconds"))
         if self.onboarding is not None:
@@ -326,6 +358,7 @@ class App:
             self.cycle.cycle_no = self.repo.new_cycle(self.session_id)
         info = STAGES[stage]
         kind = Kind(info.kind)
+        log.info("알림 표시: 단계 %d %s (남은 수술비 %s)", int(stage), stage.name, won(self.remaining()))
         ex = pick(list(self.exercises.values()), "seated_alt") if alt else self.exercises[info.exercise_id]
         cycle_no = self.cycle.cycle_no
         left = self.remaining()
@@ -376,6 +409,7 @@ class App:
         QTimer.singleShot(0, lambda: self.show_stage(stage, interrupt=True, alt=True))
 
     def on_answer(self, event_id: int, cycle_no: int, stage: Stage, result: str):
+        log.info("답: 단계 %d → %s", int(stage), result)
         QTimer.singleShot(0, self.update_mini)  # 답한 결과(수술비)를 미니 창에 반영
         # PATCH: events 행 업데이트 (done이면 completed=1, completed_at 기록)
         self.repo.answer(event_id, result)
@@ -427,6 +461,8 @@ def app_icon(assets: Path) -> QIcon:
 def main() -> None:
     qapp = QApplication(sys.argv)
     qapp.setApplicationName("posture-alert")  # DB 폴더 이름 고정
+    setup_logging()
+    log.info("시작 (python %s, %s)", sys.version.split()[0], sys.platform)
     qapp.setQuitOnLastWindowClosed(False)
 
     # 중복 실행 방지: 이미 켜져 있으면 조용히 종료 (데모/스크린샷은 여러 개 떠도 됨)
@@ -437,6 +473,7 @@ def main() -> None:
             QStandardPaths.StandardLocation.TempLocation)) / "posture-alert.lock"))
         lock.setStaleLockTime(0)  # 비정상 종료로 남은 잠금은 무시
         if not lock.tryLock(100):
+            log.info("이미 실행 중이라 종료")
             print("척추수술3000은 이미 실행 중이에요. 트레이(메뉴바) 아이콘을 확인해 주세요.")
             sys.exit(0)
 
