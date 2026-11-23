@@ -56,7 +56,9 @@ class Scheduler:
             intervals={Kind.EYE: timedelta(minutes=every_minutes) / speed,
                        Kind.POSTURE: never, Kind.STRETCH: never,
                        Kind.STAND: timedelta(minutes=90) / speed},
-            stand_repeat=timedelta(minutes=30) / speed,
+            # 일어나기는 90분마다 한 번 (그 차례의 단계 알림을 대신함). 30분마다 반복하면
+            # 90분 뒤부터 모든 알림이 일어나기로 바뀌어 단계가 안 넘어간다.
+            stand_repeat=timedelta(minutes=90) / speed,
         )
 
     def tick(self, s: Snapshot) -> Kind | None:
